@@ -4,115 +4,38 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mostlysane — Local AI Config Generator</title>
-<style>
-  :root {
-    --bg: #0d1117;
-    --card: #161b22;
-    --border: #30363d;
-    --text: #c9d1d9;
-    --accent: #58a6ff;
-    --green: #3fb950;
-    --orange: #d29922;
-    --red: #f85149;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 2rem 1rem;
-  }
-  h1 { font-size: 2rem; margin-bottom: 0.25rem; }
-  h1 span { color: var(--accent); }
-  .subtitle { color: #8b949e; margin-bottom: 2rem; }
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-  }
-  label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
-  select, input {
-    width: 100%;
-    padding: 0.6rem;
-    background: #0d1117;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text);
-    font-size: 0.95rem;
-    margin-bottom: 1rem;
-  }
-  select:focus, input:focus { outline: none; border-color: var(--accent); }
-  .badge {
-    display: inline-block;
-    padding: 0.2rem 0.5rem;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
-  }
-  .badge-green { background: rgba(63, 185, 80, 0.15); color: var(--green); }
-  .badge-orange { background: rgba(210, 153, 34, 0.15); color: var(--orange); }
-  .badge-red { background: rgba(248, 81, 73, 0.15); color: var(--red); }
-  .command-block {
-    background: #0d1117;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 1rem;
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
-    font-size: 0.85rem;
-    white-space: pre-wrap;
-    word-break: break-all;
-    overflow-x: auto;
-    position: relative;
-  }
-  .copy-btn {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    background: var(--card);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 0.3rem 0.7rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.8rem;
-  }
-  .copy-btn:hover { background: var(--border); }
-  .stat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 1rem;
-    margin: 1rem 0;
-  }
-  .stat { text-align: center; }
-  .stat-value { font-size: 1.5rem; font-weight: 700; }
-  .stat-label { font-size: 0.8rem; color: #8b949e; }
-  .hidden { display: none; }
-  hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
-  a { color: var(--accent); }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <h1>Mostlysane <span>AI</span></h1>
 <p class="subtitle">Get working on real work with local AI. Don't go crazy over AI. Stay Mostlysane.</p>
 
+<div id="loading" class="loading">
+  <p>Loading models…</p>
+</div>
+<div id="error" class="card hidden">
+  <p>Failed to load model database. Make sure the page is served from a local server (not <code>file://</code>).</p>
+</div>
+
 <div class="card">
   <h2>Your Hardware</h2>
-  <label for="gpu">GPU Model</label>
-  <select id="gpu" onchange="updateConfig()">
-    <option value="8">NVIDIA 8 GB (RTX 3070 Ti / 4060) — our reference</option>
-    <option value="12">NVIDIA 12 GB (RTX 3080 / 4070)</option>
-    <option value="16">NVIDIA 16 GB (RTX 4080 / 5070 Ti)</option>
-    <option value="24">NVIDIA 24 GB (RTX 3090 / 4090 / 5090)</option>
-    <option value="48">NVIDIA 48 GB (RTX 6000 / A6000)</option>
+
+  <label for="platform">Platform <span id="platform-detected" style="font-weight:normal;color:#8b949e;font-size:0.85rem"></span></label>
+  <select id="platform" onchange="onPlatformChange()">
+    <option value="nvidia">NVIDIA — CUDA</option>
+    <option value="apple">Apple — Metal</option>
+    <option value="amd">AMD — ROCm</option>
+    <option value="intel">Intel Arc — IPEX-LLM</option>
+    <option value="apu">Integrated / CPU only</option>
   </select>
+
+  <label for="gpu">GPU Model</label>
+  <select id="gpu" onchange="onGpuChange()"></select>
 
   <label for="ram">System RAM</label>
   <select id="ram" onchange="updateConfig()">
+    <option value="8">8 GB</option>
+    <option value="16">16 GB</option>
     <option value="32">32 GB</option>
     <option value="48">48 GB</option>
     <option value="64">64 GB</option>
@@ -124,21 +47,44 @@
     <option value="0">No — text only</option>
     <option value="1">Yes — I need vision support</option>
   </select>
+
+  <label for="os">Operating System <span id="os-detected" style="font-weight:normal;color:#8b949e;font-size:0.85rem"></span></label>
+  <select id="os" onchange="updateConfig()">
+    <option value="linux-ubuntu">🐧 Linux (Ubuntu / Debian)</option>
+    <option value="linux-fedora">🐧 Linux (Fedora / RHEL)</option>
+    <option value="linux-arch">🐧 Linux (Arch)</option>
+    <option value="macos">🍎 macOS</option>
+    <option value="windows">🪟 Windows</option>
+  </select>
 </div>
 
 <div id="recommendation" class="hidden">
-  <div class="card">
-    <h2>Recommended Model</h2>
-    <div class="stat-grid" id="stats"></div>
+  <div class="card" id="model-card">
+    <div class="card-header">
+      <h2>Recommended Model</h2>
+      <button class="card-header-btn" id="model-dropdown-btn" onclick="toggleModelPanel()" title="Switch model">
+        <span class="chevron" id="model-chevron">▾</span>
+      </button>
+    </div>
+    <div id="model-selector"></div>
+    <div id="model-panel" class="selector-panel hidden"></div>
     <div id="notes"></div>
+  </div>
+
+  <div id="memory-card" class="card hidden">
+    <h2>Hardware Usage</h2>
+    <p style="color:#8b949e;font-size:0.9rem;margin-bottom:0.75rem">
+      Estimated breakdown for your selection:
+    </p>
+    <div id="memory-usage"></div>
   </div>
 
   <div class="card">
     <h2>Command</h2>
     <div class="command-block" id="command"></div>
     <p style="margin-top:0.5rem;color:#8b949e;font-size:0.85rem">
-      Run this from your <code>llama.cpp-Ternary-1.58Bit-and-TurboQuant</code> build directory.
-      Download the model GGUF from Hugging Face first.
+      Run this from your llama.cpp build directory. Models go in <code id="model-path-note">~/AI/models/</code>
+      by default — put them there or edit the paths above.
     </p>
   </div>
 
@@ -151,113 +97,36 @@
     </p>
   </div>
 
-  <div class="card">
-    <h2>Need Help?</h2>
-    <p>See the <a href="#">full install guide</a> or
-    <a href="#">Docker setup</a> for easier deployment.</p>
+  <div class="card" id="quickstart-card">
+    <h2>Handsfree Setup — Get Started with One Command</h2>
+    <p style="color:#8b949e;font-size:0.9rem;margin-bottom:0.75rem">
+      No manual steps. Just run this in your terminal.
+    </p>
+    <div class="command-block small" id="one-liner-cmd" style="margin-bottom:0.5rem"></div>
+    <div class="command-block small" id="one-liner-win" style="margin-bottom:0.5rem"></div>
+    <p style="color:var(--text-muted);font-size:0.85rem">
+      Installs dependencies, clones the Mostlysane fork, builds llama.cpp, and
+      optionally downloads a model. Use the manual guide below for custom setups.
+    </p>
+  </div>
+
+  <div class="card" id="setup-card">
+    <h2>Manual Setup Guide</h2>
+    <div id="setup-steps"></div>
   </div>
 </div>
 
-<script>
-const MODELS = {
-  qwen36: {
-    name: 'Qwen3.6 35B A3B',
-    file: 'Qwen3.6-35B-A3B-Q5_K_M.gguf',
-    mmproj: 'mmproj-Qwen3.6-35B-A3B-F16.gguf',
-    entropy: 'entropy_profile_qwen_book.json',
-    layers: 40, kv_heads: 2, d_head: 256,
-    has_vision: true,
-    min_ram: 32,
-    min_vram: 7600,
-    max_ctx: 512000,
-    cmd: function(ctx, vram_gb) {
-      const cpu_moe = ctx > 256000 ? '40' : '39';
-      const vision = '  --mmproj mmproj-Qwen3.6-35B-A3B-F16.gguf --no-mmproj-offload \\';
-      return `llama-server -m ${this.file} \\\n${vision}\n  --alias qwen3.6-35b-a3b \\\n  -ngl 99 --n-cpu-moe ${cpu_moe} --ctx-size ${ctx} --flash-attn on \\\n  -ctk q8_0 -ctv turbo3_0 \\\n  --entropy-profile ${this.entropy} --entropy-prune-ratio 2.0 \\\n  --host 127.0.0.1 --port 8080`;
-    }
-  },
-  ministral: {
-    name: 'Ministral-3-3B Q5_K_L',
-    file: 'mistralai_Ministral-3-3B-Instruct-2512-Q5_K_L.gguf',
-    mmproj: 'mmproj-mistralai_Ministral-3-3B-Instruct-2512-f16.gguf',
-    entropy: 'entropy_profile_ministral3_book.json',
-    layers: 26, kv_heads: 8, d_head: 128,
-    has_vision: true,
-    min_ram: 8,
-    min_vram: 4000,
-    max_ctx: 131072,
-    cmd: function(ctx) {
-      return `llama-server -m ${this.file} \\\n  --mmproj ${this.mmproj} --no-mmproj-offload \\\n  --alias Ministral-3-3B -ngl 30 --ctx-size ${ctx} --flash-attn on \\\n  -ctk q8_0 -ctv turbo3_0 \\\n  --entropy-profile ${this.entropy} --entropy-prune-ratio 2.0 \\\n  --host 127.0.0.1 --port 8080`;
-    }
-  },
-  gemma4: {
-    name: 'Gemma-4-E2B 4.6B Q8_0',
-    file: 'google_gemma-4-E2B-it-Q8_0.gguf',
-    mmproj: 'mmproj-google_gemma-4-E2B-it-f16.gguf',
-    entropy: 'entropy_profile_gemma4_book.json',
-    layers: 35, kv_heads: 1, d_head: 256,
-    has_vision: true,
-    min_ram: 8,
-    min_vram: 5000,
-    max_ctx: 131072,
-    cmd: function(ctx) {
-      return `llama-server -m ${this.file} \\\n  --mmproj ${this.mmproj} --no-mmproj-offload \\\n  --alias Gemma-4-E2B --ctx-size ${ctx} --flash-attn on \\\n  -ctk q8_0 -ctv turbo3_0 \\\n  --entropy-profile ${this.entropy} --entropy-prune-ratio 2.0 \\\n  --host 127.0.0.1 --port 8080`;
-    }
-  }
-};
+<!-- Comparison modal -->
+<div id="compare-modal" class="modal-overlay hidden" onclick="closeCompare()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Model Quality Comparison</h2>
+      <button class="modal-close" onclick="closeCompare()">&times;</button>
+    </div>
+    <iframe class="modal-frame" src="" id="compare-frame"></iframe>
+  </div>
+</div>
 
-function updateConfig() {
-  const vram = parseInt(document.getElementById('gpu').value);
-  const ram = parseInt(document.getElementById('ram').value);
-  const vision = document.getElementById('vision').value === '1';
-
-  let best = null;
-  if (vram >= 24) {
-    best = MODELS.qwen36;
-  } else if (vram >= 8 && ram >= 32) {
-    best = MODELS.qwen36;
-  } else if (vram >= 6) {
-    best = MODELS.ministral;
-  } else {
-    best = MODELS.ministral;
-  }
-
-  if (!vision && best === MODELS.qwen36 && vram < 24 && ram >= 32) {
-    // Qwen still works text-only, keep it
-  }
-
-  if (vision && !best.has_vision) {
-    best = MODELS.ministral;
-  }
-
-  document.getElementById('recommendation').classList.remove('hidden');
-
-  const ctx = vram >= 24 ? best.max_ctx :
-              best === MODELS.qwen36 ? 200000 : 131072;
-
-  document.getElementById('stats').innerHTML = `
-    <div class="stat"><div class="stat-value">${best.name}</div><div class="stat-label">Model</div></div>
-    <div class="stat"><div class="stat-value">${(ctx/1000).toFixed(0)}K</div><div class="stat-label">Context</div></div>
-    <div class="stat"><div class="stat-value">${best === MODELS.qwen36 ? 'Q5_K_M' : best === MODELS.ministral ? 'Q5_K_L' : 'Q8_0'}</div><div class="stat-label">Quant</div></div>
-    <div class="stat"><div class="stat-value"><span class="badge badge-green">✅ Fit</span></div><div class="stat-label">Status</div></div>
-  `;
-
-  document.getElementById('command').textContent = best.cmd(ctx, vram);
-
-  document.getElementById('entropy-note').innerHTML =
-    `This model needs a <strong>one-time calibration</strong> to generate <code>${best.entropy}</code>. ` +
-    `Already calibrated and committed in our fork.`;
-
-  document.getElementById('entropy-command').textContent =
-    `./build/bin/llama-entropy-calibrate -m ~/AI/models/${best.file} \\\n  -ngl 99 --n-cpu-moe ${best.layers} -c 4096 -b 4096`;
-
-  document.getElementById('notes').innerHTML = '';
-  if (best === MODELS.qwen36 && vram < 24) {
-    document.getElementById('notes').innerHTML +=
-      `<p style="margin-top:0.5rem">⚠️ <strong>MoE CPU offloading:</strong> Qwen3.6 35B needs 32 GB+ system RAM — MoE experts run on CPU.</p>`;
-  }
-}
-updateConfig();
-</script>
+<script src="app.js"></script>
 </body>
 </html>
