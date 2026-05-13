@@ -145,7 +145,7 @@ let panelOutsideHandler = null;
 // ─────────────────────────────────────────────────
 async function loadModels() {
   try {
-    const url = window.location.origin + '/models.json';
+    const url = 'models.json';
     const res = await fetch(url);
     if (!res.ok) {
       throw new Error('HTTP ' + res.status + ': ' + res.statusText);
@@ -166,7 +166,7 @@ async function loadModels() {
         + '<p style="font-size:0.85rem;color:var(--orange);margin-top:0.5rem">'
         + (err.message || err) + '</p>'
         + '<p style="font-size:0.85rem;color:var(--text-muted);margin-top:0.5rem">URL: <code>'
-        + window.location.origin + '/models.json</code></p>';
+        + window.location.protocol + '//' + window.location.host + window.location.pathname.replace(/[^/]*$/, '') + 'models.json</code></p>';
     } else {
       document.body.insertAdjacentHTML('afterbegin',
         '<div style="background:#f85149;color:#fff;padding:1rem;font-family:sans-serif">'
