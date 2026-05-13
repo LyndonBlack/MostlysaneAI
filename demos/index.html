@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mostlysane — Model Quality Comparison</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  body { padding: 1rem; max-width: 600px; }
+  h2 { margin-bottom: 0.25rem; }
+  .model-source { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 1rem; }
+  .demo-frame {
+    width: 100%;
+    height: 400px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    background: #000;
+  }
+  .demo-card { margin-bottom: 2rem; }
+  .back-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+  .back-link:hover { text-decoration: underline; }
+  .verdict {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+    padding: 0.75rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+<h1>Mostlysane <span>AI</span></h1>
+<p class="subtitle">Model quality comparison — same prompt, same seed, 4 models. Judge for yourself.</p>
+
+
+<div class="verdict">
+  <strong>🎯 The challenge:</strong> Generate a walking dog animation using HTML Canvas and JavaScript.
+  Same prompt given to each model. No cherry-picking. This is real output.
+</div>
+
+<div class="demo-card">
+  <h2>Qwen3.6 35B A3B</h2>
+  <div class="model-source">Mostlysane recommended — local, 35B MoE, Q5_K_M</div>
+  <iframe class="demo-frame" src="qwen3.6_walking_dog_animation_test.html" loading="lazy"></iframe>
+</div>
+
+<div class="demo-card">
+  <h2>ChatGPT 5.5</h2>
+  <div class="model-source">Cloud — OpenAI, massive scale</div>
+  <iframe class="demo-frame" src="ChatGPT5-5_walking_dog_animation_test.html" loading="lazy"></iframe>
+</div>
+
+<div class="demo-card">
+  <h2>Claude Sonnet 4.6</h2>
+  <div class="model-source">Cloud — Anthropic, strong coding model</div>
+  <iframe class="demo-frame" src="Claude_Sonnet_4-6_walking_dog_animation_test.html" loading="lazy"></iframe>
+</div>
+
+<div class="demo-card">
+  <h2>Gemini Pro 3.1</h2>
+  <div class="model-source">Cloud — Google, multimodal</div>
+  <iframe class="demo-frame" src="Gemini_pro_3-1_walking_dog_animation_test.html" loading="lazy"></iframe>
+</div>
+
+<p style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem">
+  All demos load the original model output as standalone Canvas animations.
+  Refresh if they don't start — your browser may need to load the iframes.
+</p>
+
+<div class="card" style="margin-top:2rem">
+  <h2>Give It a Go on Your Favourite Model</h2>
+  <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:0.75rem">
+    Same prompt used for all four demos above. Paste it into any model to compare.
+  </p>
+  <div class="command-block" id="dog-prompt" style="font-size:0.8rem;white-space:pre-wrap;word-break:break-word">Prompt: Act as an expert creative coder and frontend developer. Write a complete, single-file HTML document (containing HTML, inline CSS, and vanilla JavaScript) to create a high-fidelity, fully procedural animation of a detailed person walking briskly down a road while walking a dog on a leash.
+
+Strict Technical &amp; Design Constraints:
+1. Single File: All CSS and JavaScript must be contained within the single HTML file. Absolutely no external assets, libraries (like Three.js or P5.js), or image files are allowed.
+2. High-Fidelity Visuals: Use HTML5 Canvas API or complex SVG paths generated via JS. The person and the dog must have detailed, recognizable anatomical proportions (head, torso, articulated limbs, tail, etc.), avoiding simplistic stick figures.
+3. Dynamic Animation Mechanics: Implement a brisk, energetic walking cycle for both characters. Use procedural animation techniques (e.g., trigonometric functions like Math.sin/Math.cos for limb articulation) so the movement is fluid and not sluggish.
+4. The Leash: A visual leash must smoothly connect the person's hand to the dog's collar, updating its physics or curve dynamically as they move.
+5. Immersive Environment: Include a beautifully designed, scrolling road or a parallax background (like trees, city skyline, or clouds) to create a strong illusion of fast forward movement.
+6. Fullscreen &amp; Looping: The canvas must be completely responsive, covering the entire screen (100vw, 100vh) with no scrollbars. The animation must run in an infinite, seamless loop using requestAnimationFrame.
+7. Zero Text: There must be absolutely no text rendered on the screen.
+
+Output strictly the raw HTML code inside a single code block. Ensure the code is self-contained, highly optimized, and runs flawlessly upon opening in any modern browser.</div>
+</div>
+
+<script>
+(function() {
+  var block = document.getElementById('dog-prompt');
+  if (!block) return;
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.innerHTML = '<svg aria-hidden="true" fill="currentColor" height="18px" viewBox="0 -960 960 960" width="18px"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>';
+  btn.title = 'Copy prompt';
+  btn.onclick = function() {
+    navigator.clipboard.writeText(block.textContent).then(function() {
+      btn.innerHTML = '<svg aria-hidden="true" fill="currentColor" height="18px" viewBox="0 -960 960 960" width="18px"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></svg>';
+      setTimeout(function() { btn.innerHTML = '<svg aria-hidden="true" fill="currentColor" height="18px" viewBox="0 -960 960 960" width="18px"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>'; }, 2000);
+    });
+  };
+  block.appendChild(btn);
+})();
+</script>
+
+</body>
+</html>
