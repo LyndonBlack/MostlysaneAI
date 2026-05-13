@@ -300,15 +300,19 @@ function updateInstallGuide() {
   if (!os) return;
 
   // Populate one-liner installer commands
+  var nixCmd = 'curl -sSL https://lyndonblack.github.io/MostlysaneAI/install/install.sh | bash';
+  var winCmd = 'powershell -c "irm https://lyndonblack.github.io/MostlysaneAI/install/install.ps1 | iex"';
   var oneLinerNix = document.getElementById('one-liner-cmd');
   var oneLinerWin = document.getElementById('one-liner-win');
   if (oneLinerNix) {
-    oneLinerNix.textContent = 'curl -sSL https://lyndonblack.github.io/MostlysaneAI/install/install.sh | bash';
+    oneLinerNix.textContent = nixCmd;
+    addCopyButton('one-liner-cmd', nixCmd);
     if (osKey === 'windows') oneLinerNix.style.display = 'none';
     else oneLinerNix.style.display = '';
   }
   if (oneLinerWin) {
-    oneLinerWin.textContent = 'powershell -c "irm https://lyndonblack.github.io/MostlysaneAI/install/install.ps1 | iex"';
+    oneLinerWin.textContent = winCmd;
+    addCopyButton('one-liner-win', winCmd);
     if (osKey === 'windows') oneLinerWin.style.display = '';
     else oneLinerWin.style.display = 'none';
   }
