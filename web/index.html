@@ -3,142 +3,274 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mostlysane — Local AI Config Generator</title>
+<title>Mostlysane AI — Local AI That Actually Works</title>
 <link rel="stylesheet" href="style.css">
+<style>
+/* ── Landing page overrides ── */
+body {
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  padding-top: 56px;
+}
+
+/* ── Nav ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(13,17,23,0.92); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1.5rem; height: 56px;
+}
+nav .logo { font-size: 1.1rem; font-weight: 700; color: var(--text); text-decoration: none; }
+nav .logo span { color: var(--accent); }
+nav .links { display: flex; gap: 0.5rem; }
+nav .links a {
+  color: var(--text-muted); text-decoration: none; font-size: 0.85rem;
+  padding: 0.4rem 0.7rem; border-radius: 6px; transition: 0.15s;
+}
+nav .links a:hover { color: var(--text); background: var(--card); }
+nav .links a.active { color: var(--accent); }
+
+/* ── Sections ── */
+.section {
+  max-width: 960px; margin: 0 auto; padding: 2.8rem 1.5rem;
+}
+.section.dark { background: var(--card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.section h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.section h2 span { color: var(--accent); }
+.section .lead { color: var(--text-muted); font-size: 1.05rem; margin-bottom: 2rem; max-width: 860px; }
+
+/* ── Hero ── */
+.hero {
+  text-align: center; padding: 5rem 1.5rem 2rem;
+}
+.hero h1 { font-size: 2.8rem; margin-bottom: 0.5rem; }
+.hero h1 span { color: var(--accent); }
+.hero .tagline {
+  font-size: 1.15rem; color: var(--text-muted); max-width: 600px; margin: 0 auto 2rem; line-height: 1.5;
+}
+.hero .cta-buttons { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+.hero .cta {
+  display: inline-block; padding: 0.75rem 1.5rem; border-radius: 8px;
+  font-size: 0.95rem; font-weight: 600; text-decoration: none; transition: 0.15s;
+}
+.hero .cta.primary { background: var(--accent); color: #fff; }
+.hero .cta.primary:hover { background: #4a96ef; }
+.hero .cta.secondary { border: 1px solid var(--border); color: var(--text); }
+.hero .cta.secondary:hover { border-color: var(--text-muted); background: var(--card); }
+
+/* ── Badge row ── */
+.badges { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 2.5rem; }
+.badge-item { text-align: center; }
+.badge-item .num { font-size: 1.6rem; font-weight: 700; color: var(--accent); display: block; }
+.badge-item .label { font-size: 0.8rem; color: var(--text-muted); }
+
+/* ── Feature cards ── */
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1rem; }
+.feature-card {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem;
+}
+.feature-card .icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.feature-card h3 { font-size: 1.05rem; margin-bottom: 0.4rem; }
+.feature-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
+.feature-card a { color: var(--accent); }
+
+/* ── Results table ── */
+.result-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 1rem; }
+.result-table th, .result-table td {
+  text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border);
+}
+.result-table th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.result-table td { color: var(--text); }
+.result-table tr:last-child td { border-bottom: none; }
+.result-table .badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+
+/* ── CTA ── */
+.cta-section { text-align: center; }
+
+/* ── Footer ── */
+footer {
+  border-top: 1px solid var(--border); padding: 2rem 1.5rem; font-size: 0.8rem; color: var(--text-muted);
+  text-align: center;
+}
+footer .links { display: flex; justify-content: center; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+footer .links a { color: var(--text-muted); text-decoration: none; }
+footer .links a:hover { color: var(--text); }
+footer .marvin { color: #636; font-style: italic; }
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .hero h1 { font-size: 2rem; }
+  nav .links a { font-size: 0.78rem; padding: 0.3rem 0.5rem; }
+  .feature-grid { grid-template-columns: 1fr; }
+}
+</style>
 </head>
 <body>
-<h1>Mostlysane <span>AI</span></h1>
-<p class="subtitle">Get working on real work with local AI. Don't go crazy over AI. Stay Mostlysane.</p>
 
-<div id="loading" class="loading">
-  <p>Loading models…</p>
-</div>
-<div id="error" class="card hidden">
-  <p>Failed to load model database. Make sure the page is served from a local server (not <code>file://</code>).</p>
-</div>
+<nav>
+  <a href="/" class="logo">Mostlysane <span>AI</span></a>
+  <div class="links">
+    <a href="/" class="active">Home</a>
+    <a href="getstarted.html">Get Started</a>
+    <a href="demos/">Demos</a>
+    <a href="research.html">Research</a>
+    <a href="about.html">About</a>
+  </div>
+</nav>
 
-<div class="card">
-  <h2>Your Hardware</h2>
+<section class="hero">
+  <h1>Mostlysane <span>AI</span></h1>
+  <p class="tagline">
+    Run cutting-edge local AI on everyday hardware.<br>
+    Ternary quantization &bull; Compressed KV cache &bull; 512K context on 8GB GPUs
+  </p>
+  <div class="cta-buttons">
+    <a href="getstarted.html" class="cta primary">Get Started</a>
+    <a href="research.html" class="cta secondary">Read the Research</a>
+    <a href="demos/" class="cta secondary">See Demos</a>
+  </div>
+  <div class="badges">
+    <div class="badge-item"><span class="num">3</span><span class="label">Research Tracks<br>Combined</span></div>
+    <div class="badge-item"><span class="num">512K</span><span class="label">Context Window<br>on 8GB GPUs</span></div>
+    <div class="badge-item"><span class="num">12/12</span><span class="label">CodeNeedle<br>Perfect Score</span></div>
+    <div class="badge-item"><span class="num">1.58</span><span class="label">Bit Ternary<br>Quantization</span></div>
+  </div>
+</section>
 
-  <label for="platform">Platform <span id="platform-detected" style="font-weight:normal;color:#8b949e;font-size:0.85rem"></span></label>
-  <select id="platform" onchange="onPlatformChange()">
-    <option value="nvidia">NVIDIA — CUDA</option>
-    <option value="apple">Apple — Metal</option>
-    <option value="amd">AMD — ROCm</option>
-    <option value="intel">Intel Arc — IPEX-LLM</option>
-    <option value="apu">Integrated / CPU only</option>
-  </select>
+<section class="section">
+  <h2>What <span>We Built</span></h2>
+  <p class="lead">
+    Mostlysane is a curated stack of three research forks merged into a single
+    <a href="https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant">llama.cpp build</a>.
+    The goal: make the latest model architectures and context sizes accessible on the hardware people actually own.
+  </p>
 
-  <label for="gpu">GPU Model</label>
-  <select id="gpu" onchange="onGpuChange()"></select>
-
-  <label for="ram">System RAM</label>
-  <select id="ram" onchange="updateConfig()">
-    <option value="8">8 GB</option>
-    <option value="16">16 GB</option>
-    <option value="32">32 GB</option>
-    <option value="48">48 GB</option>
-    <option value="64">64 GB</option>
-    <option value="128">128 GB+</option>
-  </select>
-
-  <label for="vision">Need Vision (image input)?</label>
-  <select id="vision" onchange="updateConfig()">
-    <option value="0">No — text only</option>
-    <option value="1">Yes — I need vision support</option>
-  </select>
-
-  <label for="os">Operating System <span id="os-detected" style="font-weight:normal;color:#8b949e;font-size:0.85rem"></span></label>
-  <select id="os" onchange="updateConfig()">
-    <option value="linux-ubuntu">🐧 Linux (Ubuntu / Debian)</option>
-    <option value="linux-fedora">🐧 Linux (Fedora / RHEL)</option>
-    <option value="linux-arch">🐧 Linux (Arch)</option>
-    <option value="macos">🍎 macOS</option>
-    <option value="windows">🪟 Windows</option>
-  </select>
-</div>
-
-<div id="recommendation" class="hidden">
-  <div class="card" id="model-card">
-    <div class="card-header">
-      <h2>Recommended Model</h2>
-      <button class="card-header-btn" id="model-dropdown-btn" onclick="toggleModelPanel()" title="Switch model">
-        <span class="chevron" id="model-chevron">▾</span>
-      </button>
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="icon">🧮</div>
+      <h3>Ternary Quantization</h3>
+      <p>
+        Ported from a <a href="https://huggingface.co/prism-ml">1.58-bit ternary research fork</a>.
+        Weights become {-1, 0, +1} — 2 bits per parameter. Enables a new branch of models such as Bonsai 8B to run with minimal memory overhead.
+      </p>
     </div>
-    <div class="usage-tier-section">
-      <label for="usage-tier">Your Usage</label>
-      <input type="range" id="usage-tier" min="1" max="5" value="3" oninput="onUsageTierChange()" step="1">
-      <div class="usage-tier-labels">
-        <span>Quick</span>
-        <span>Basic</span>
-        <span> Smart</span>
-        <span>Complex</span>
-        <span>Deep</span>
-      </div>
-      <p id="usage-tier-desc" class="usage-tier-desc">Good for creative writing, code review, and general advice.</p>
+    <div class="feature-card">
+      <div class="icon">💾</div>
+      <h3>TurboQuant KV Cache</h3>
+      <p>
+        K-side compression via <a href="https://github.com/TheTom">TurboQuant</a>: turbo4 (4-bit), turbo6 (6-bit), mixed
+        precision. V-side via turbo3 (Walsh-Hadamard + PolarQuant, ~3.125 bit).
+        Reduces KV cache to 3Gb even at 512K context.
+      </p>
     </div>
-    <div id="model-selector"></div>
-    <div id="model-panel" class="selector-panel hidden"></div>
-    <div id="notes"></div>
-  </div>
-
-  <div id="memory-card" class="card hidden">
-    <h2>Hardware Usage</h2>
-    <p style="color:#8b949e;font-size:0.9rem;margin-bottom:0.75rem">
-      Estimated breakdown for your selection:
-    </p>
-    <div id="memory-usage"></div>
-  </div>
-
-  <div class="card">
-    <h2>Command</h2>
-    <div class="command-block" id="command"></div>
-    <p style="margin-top:0.5rem;color:#8b949e;font-size:0.85rem">
-      Run this from your llama.cpp build directory. Models go in <code id="model-path-note">~/AI/models/</code>
-      by default — put them there or edit the paths above.
-    </p>
-  </div>
-
-  <div class="card" id="entropy-card">
-    <h2>Entropy Profile</h2>
-    <p id="entropy-note"></p>
-    <div class="command-block" id="entropy-command"></div>
-    <p style="margin-top:0.5rem;color:#8b949e;font-size:0.85rem">
-      One-time calibration per model. The profile is quantization-invariant — same file works for Q8, Q5, Q4 quants.
-    </p>
-  </div>
-
-  <div class="card" id="quickstart-card">
-    <h2>Handsfree Setup — Get Started with One Command</h2>
-    <p style="color:#8b949e;font-size:0.9rem;margin-bottom:0.75rem">
-      No manual steps. Just run this in your terminal.
-    </p>
-    <div class="command-block small" id="one-liner-cmd" style="margin-bottom:0.5rem"></div>
-    <div class="command-block small" id="one-liner-win" style="margin-bottom:0.5rem"></div>
-    <p style="color:var(--text-muted);font-size:0.85rem">
-      Installs dependencies, clones the Mostlysane fork, builds llama.cpp, and
-      optionally downloads a model. Use the manual guide below for custom setups.
-    </p>
-  </div>
-
-  <div class="card" id="setup-card">
-    <h2>Manual Setup Guide</h2>
-    <div id="setup-steps"></div>
-  </div>
-</div>
-
-<!-- Comparison modal -->
-<div id="compare-modal" class="modal-overlay hidden" onclick="closeCompare()">
-  <div class="modal-box" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <h2>Model Quality Comparison</h2>
-      <button class="modal-close" onclick="closeCompare()">&times;</button>
+    <div class="feature-card">
+      <div class="icon">📊</div>
+      <h3>Entropy-Adaptive Precision</h3>
+      <p>
+        <a href="https://github.com/SCJedi/entropy-adaptive-kv-cache">Per-layer entropy profiling</a> identifies which layers need full 8-bit K
+        and which can use compressed types. Mixed precision keeps quality where it
+        counts, memory savings everywhere else. Profiles for 5 models included, and a tool to create your own.
+      </p>
     </div>
-    <iframe class="modal-frame" src="" id="compare-frame"></iframe>
   </div>
-</div>
+</section>
 
-<script src="app.js"></script>
+<section class="section dark">
+  <h2>Why It <span>Matters</span></h2>
+  <p class="lead">
+    New MoE architectures (Qwen3.6 35B A3B) unlock massive capability.
+    But without custom load configurations and optimizations to caching, the KV cache consumes gigabytes at longer contexts — pushing them beyond reach of 8–12 GB GPUs. With our stack, MoE models put the important layers into GPU, reduce KV Cache without loss of quality and provide great performance, even with a massive 512k context window.
+  </p>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <h3>Before</h3>
+      <p>Full-precision K/V cache at 512K context: <strong style="color:var(--red)">~11 GB</strong><br>
+      Qwen3.6 35B requires <strong style="color:var(--red)">24 GB+ GPU</strong> or reduced context</p>
+    </div>
+    <div class="feature-card">
+      <h3>After</h3>
+      <p>Calibrated entopy with TurboQuant K+V at 512K context: <strong style="color:var(--green)">~3 MB</strong><br>
+      Qwen3.6 35B fits on <strong style="color:var(--green)">8 GB GPU</strong> with full 512K context</p>
+    </div>
+    <div class="feature-card">
+      <h3>Calibrated Entropy</h3>
+      <p>Some things are more important that others. Mixed precision preserves quality on attention-critical layers.<br>
+      Calibrated per model — set and forget.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <h2>Quality &amp; <span>Performance</span></h2>
+  <p class="lead">
+    We test configs against real-world multi-length recall & coding tasks and visual demos.
+    Compression doesn't matter if quality suffers.
+  </p>
+
+  <table class="result-table">
+    <tr>
+      <th>Config</th><th>K Bits</th><th>V Bits</th><th>Quality</th><th>Prefill</th><th>Gen</th><th>512K Cache</th>
+    </tr>
+    <tr>
+      <td>Default F16 K &amp; V, No optimisation</td>
+      <td>16</td><td>16</td>
+      <td><span class="badge" style="background:var(--text);color:#000">Baseline</span></td>
+      <td>3600 t/s</td><td>12 t/s</td>
+      <td style="color:var(--red)">~10,500 MB</td>
+    </tr>
+    <tr>
+      <td>Q8_0 + Turbo3_0 with Entropy</td>
+      <td>8</td><td>3.125</td>
+      <td><span class="badge" style="background:var(--green);color:#000">Production</span></td>
+      <td>3372 t/s</td><td>107 t/s</td>
+      <td style="color:var(--green)">~3,000 MB</td>
+    </tr>
+    <tr>
+      <td>TurboQuant 6_0 + TurboQuant 3_0</td>
+      <td>6</td><td>3.125</td>
+      <td><span class="badge" style="background:var(--orange);color:#000">Lossy</span></td>
+      <td>3168 t/s</td><td>99 t/s</td>
+      <td style="color:var(--green)">~3,200 MB</td>
+    </tr>
+    <tr>
+      <td>TurboQuant 4_0 + TurboQuant 3_0</td>
+      <td>4</td><td>3.125</td>
+      <td><span class="badge" style="background:var(--red);color:#fff">Fragile</span></td>
+      <td>3268 t/s</td><td>104 t/s</td>
+      <td style="color:var(--orange)">~2,700 MB</td>
+    </tr>
+  </table>
+
+  <p style="color:var(--text-muted);font-size:0.8rem;margin-top:0.75rem">
+    Benchmarked on AMD Rzyen 3800x, RTX 3070 Ti 8GB &bull; Qwen3.6 35B A3B <a href="demos/" style="color:var(--accent)">See visual comparisons →</a>
+  </p>
+</section>
+
+<section class="section cta-section" style="padding-bottom:2rem">
+  <h2>Ready to <span>Try It?</span></h2>
+  <p class="lead" style="margin:0 auto 0.75rem">
+    Generate a complete config tailored to your hardware in under 60 seconds.
+  </p>
+  <a href="getstarted.html" style="display:inline-block;padding:0.8rem 2rem;border-radius:8px;background:var(--accent);color:#fff;text-decoration:none;font-weight:600">Get My Config</a>
+  <p style="color:var(--text-muted);font-size:0.8rem;margin-top:0.75rem">
+    Or dive straight in: <code style="color:var(--accent)">curl -sSL mostlysane.ai/install.sh | bash</code>
+  </p>
+</section>
+
+<footer>
+  <div class="links">
+    <a href="/">Home</a>
+    <a href="getstarted.html">Get Started</a>
+    <a href="demos/">Demos</a>
+    <a href="research.html">Research</a>
+    <a href="about.html">About</a>
+    <a href="https://github.com/LyndonBlack/MostlysaneAI">GitHub</a>
+  </div>
+  <p>Built by <a href="about.html" style="color:var(--text-muted);text-decoration:none">Lyndon Black</a> &amp; <span class="marvin">Marvin 🦄</span></p>
+</footer>
+
 </body>
 </html>
