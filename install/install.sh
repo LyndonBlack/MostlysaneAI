@@ -39,7 +39,7 @@ echo "📋 Detected: $PLATFORM ($ARCH)"
 echo ""
 
 # Check for existing build
-BUILD_DIR="$HOME/AI/llama.cpp-Ternary-1.58Bit-and-TurboQuant"
+BUILD_DIR="$HOME/AI/MostlysaneAI"
 MODEL_DIR="$HOME/AI/models"
 
 if [ -d "$BUILD_DIR/build/bin" ]; then
@@ -110,8 +110,8 @@ echo ""
 echo "┌─────────────────────────────────────────┐"
 echo "│  ✅ All set!                             │"
 echo "│  Run your server (from anywhere):        │"
-echo "│  ~/AI/llama.cpp-Ternary-1.58Bit-and-     │"
-echo "│    TurboQuant/build/bin/llama-server \    │"
+echo "│  ~/AI/MostlysaneAI/build/bin/        │"
+echo "│    llama-server \                         │"
 echo "│    -m ~/AI/models/${MODEL} \             │"
 echo "│    --host 127.0.0.1 --port 8080          │"
 echo "│                                          │"

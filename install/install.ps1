@@ -3,7 +3,7 @@
 
 $REPO = "https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git"
 $MODEL_DIR = "$env:USERPROFILE\AI\models"
-$BUILD_DIR = "$env:USERPROFILE\AI\llama.cpp-Ternary-1.58Bit-and-TurboQuant"
+$BUILD_DIR = "$env:USERPROFILE\AI\MostlysaneAI"
 
 Write-Host "┌─────────────────────────────────────────┐" -ForegroundColor Cyan
 Write-Host "│  🦄 Mostlysane Local AI Installer       │" -ForegroundColor Cyan
