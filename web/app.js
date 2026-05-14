@@ -418,7 +418,7 @@ curl -L -o ${os.modelDir}${f} ${hfUrl}</div>
   }
 
   html += `</ol><hr><p style="font-size:0.9rem;color:var(--text-muted)">
-    📦 One-liner installer coming soon — <code>curl -sSL mostlysane.ai/install.sh | bash</code>
+    💡 Prefer handsfree? Use the <a href="#" onclick="document.getElementById('quickstart-card').scrollIntoView({behavior:'smooth'});return false" style="color:var(--accent)">one-liner installer</a> at the top of the page.
   </p>`;
   document.getElementById('setup-steps').innerHTML = html;
 
