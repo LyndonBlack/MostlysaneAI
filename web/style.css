@@ -112,6 +112,88 @@ select:focus, input:focus { outline: none; border-color: var(--accent); }
 .usage-tier-desc strong {
   color: var(--text);
 }
+
+/* ── Entropy toggle ── */
+.model-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 0.6rem 0 0.2rem;
+}
+.model-switch-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: 0.15s;
+  white-space: nowrap;
+}
+.model-switch-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.model-switch-btn .chevron {
+  font-size: 0.7rem;
+  transition: 0.2s;
+}
+.model-switch-btn .chevron.open {
+  transform: rotate(180deg);
+}
+.entropy-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  user-select: none;
+}
+.entropy-toggle-label input[type="checkbox"] {
+  display: none;
+}
+.entropy-toggle-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: 0.2s;
+  flex-shrink: 0;
+}
+.entropy-toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  transition: 0.2s;
+}
+.entropy-toggle-label input:checked + .entropy-toggle-switch {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.entropy-toggle-label input:checked + .entropy-toggle-switch::after {
+  left: 18px;
+  background: #fff;
+}
+.entropy-toggle-label:hover .entropy-toggle-switch {
+  border-color: var(--accent);
+}
+.entropy-toggle-label strong {
+  color: var(--text);
+}
+
 .badge {
   display: inline-block;
   padding: 0.2rem 0.5rem;

@@ -139,6 +139,13 @@ const USAGE_TIERS = [
     maxContext: 999999999 }
 ];
 
+// Context sizes to probe for VRAM-aware fitting (grows by ~25-50% each step)
+const CONTEXT_SIZES = [
+  4096, 8192, 16384, 32768, 49152, 65536, 81920, 98304, 114688,
+  131072, 163840, 196608, 229376, 262144, 294912, 327680,
+  360448, 393216, 425984, 458752, 491520, 524288
+];
+
 // ─────────────────────────────────────────────────
 //  Usage tier helpers
 // ─────────────────────────────────────────────────
@@ -163,14 +170,37 @@ function onUsageTierChange() {
 }
 
 // ─────────────────────────────────────────────────
+//  Entropy toggle
+// ─────────────────────────────────────────────────
+function isEntropyEnabled() {
+  const el = document.getElementById('entropy-toggle');
+  return el ? el.checked : true;
+}
+
+function onEntropyToggle() {
+  updateConfig();
+}
+
+// ─────────────────────────────────────────────────
 //  Effective VRAM (platform-aware)
 // ─────────────────────────────────────────────────
+// GPU system overhead per platform (driver, display manager, kernel reservations)
+// — these are consumed before any model runs and reduce usable VRAM
+const GPU_SYSTEM_OVERHEAD = {
+  nvidia: 700,   // NVIDIA driver + display buffers
+  apple: 7000,   // macOS Tahoe system reservation (unified memory)
+  amd: 700,      // AMD ROCm driver overhead
+  intel: 700,    // Intel Arc (IPEX-LLM) driver overhead
+  apu: 0         // CPU-only — no dedicated GPU VRAM
+};
+
 function getEffectiveVram() {
   const vramGb = parseInt(document.getElementById('gpu').value);
   const platform = document.getElementById('platform').value;
-  // Apple Silicon reserves ~6 GB for macOS Tahoe system
-  if (platform === 'apple') return Math.max(1000, vramGb * 1000 - 6000);
-  return vramGb * 1000;
+  // APU/integrated: no dedicated GPU VRAM — CPU-only models only
+  if (platform === 'apu') return 100;
+  const overhead = GPU_SYSTEM_OVERHEAD[platform] || 700;
+  return Math.max(500, vramGb * 1000 - overhead);
 }
 
 // ─────────────────────────────────────────────────
@@ -302,7 +332,9 @@ function getVariantFile(model) {
   return model.file || model.id + '.gguf';
 }
 
-function getVariantMemory(model) {
+function getVariantMemory(model, wantEntropy) {
+  const hasEntropy = model.entropy_profile && (wantEntropy !== false);
+  const entropyPct = hasEntropy ? 30 : 0;
   const v = getVariant(model);
   if (!v) {
     // No variant selected — use first variant if available
@@ -311,7 +343,7 @@ function getVariantMemory(model) {
       return {
         file_gb: v0.file_gb, gpu_weights_mib: v0.gpu_weights_mib,
         ram_weights_mib: v0.ram_weights_mib, kv_per_100k_mib: v0.kv_per_100k_mib,
-        entropy_savings_pct: 30, vision_mmproj_mib: model.mmproj ? 887 : 0,
+        entropy_savings_pct: entropyPct, vision_mmproj_mib: model.mmproj ? 887 : 0,
         overhead_mib: v0.overhead_mib || 400
       };
     }
@@ -322,7 +354,7 @@ function getVariantMemory(model) {
     gpu_weights_mib: v.gpu_weights_mib,
     ram_weights_mib: v.ram_weights_mib,
     kv_per_100k_mib: v.kv_per_100k_mib,
-    entropy_savings_pct: 30,
+    entropy_savings_pct: entropyPct,
     vision_mmproj_mib: model.mmproj ? 887 : 0,
     overhead_mib: v.overhead_mib || 400
   };
@@ -444,47 +476,84 @@ curl -L -o ${os.modelDir}${f} ${hfUrl}</div>
 // ─────────────────────────────────────────────────
 //  Estimates
 // ─────────────────────────────────────────────────
-function getContextForModel(model, vramMib) {
-  const tier = getUsageTier();
-  // Tiers 4 and 5 don't cap by tier — use available VRAM logic only
-  if (tier >= 4) {
-    const rawGb = parseInt(document.getElementById('gpu').value);
-    if (rawGb >= 24) return model.max_ctx;
-    if (model.id === 'qwen36' || model.id === 'qwen3vl') return 200000;
-    return Math.min(model.max_ctx, 131072);
+function findMaxContext(model, vramMib, wantVision, maxDesired) {
+  const maxFit = model.max_ctx || 524288;
+  const upperBound = Math.min(maxDesired || Infinity, maxFit);
+  
+  const platform = document.getElementById('platform').value;
+  // CPU-only mode or APU: context isn't VRAM-bound
+  const mem = getVariantMemory(model, isEntropyEnabled());
+  if (mem && (mem.gpu_weights_mib === 0 || platform === 'apu')) return Math.min(maxFit, upperBound);
+  
+  // Probe context sizes to find the largest that fits
+  let best = 4096;
+  for (let i = 0; i < CONTEXT_SIZES.length; i++) {
+    const ctx = CONTEXT_SIZES[i];
+    if (ctx > upperBound) break;
+    if (ctx > maxFit) break;
+    const est = estimateVram(model, ctx, wantVision, isEntropyEnabled());
+    if (est && est.total <= vramMib * 0.95) {
+      best = ctx;
+    } else {
+      // Once one fails, no larger size will fit
+      break;
+    }
   }
-  // Tiers 1-3 cap by usage tier
-  const tierCtx = USAGE_TIERS.find(x => x.id === tier).maxContext;
-  return Math.min(model.max_ctx, tierCtx);
+  // If none of the preset sizes hit the upper bound exactly, try the bound itself
+  if (best < upperBound && best < maxFit) {
+    const maxEst = estimateVram(model, upperBound, wantVision, isEntropyEnabled());
+    if (maxEst && maxEst.total <= vramMib * 0.95) {
+      best = upperBound;
+    }
+  }
+  return best;
 }
 
-function estimateVram(model, ctx, wantVision) {
-  const mem = getVariantMemory(model);
+function getContextForModel(model, vramMib) {
+  const tier = getUsageTier();
+  const tierInfo = USAGE_TIERS.find(x => x.id === tier);
+  const tierCtx = tierInfo ? tierInfo.maxContext : 65536;
+  const vision = document.getElementById('vision').value === '1';
+  
+  // For tiers 4-5: find the max context that fits in VRAM, bounded by model max
+  if (tier >= 4) {
+    return findMaxContext(model, vramMib, vision, model.max_ctx);
+  }
+  
+  // For tiers 1-3: prefer tier context, but reduce if VRAM constrained
+  const vramCtx = findMaxContext(model, vramMib, vision, tierCtx);
+  return Math.min(tierCtx, Math.max(vramCtx, 4096));
+}
+
+function estimateVram(model, ctx, wantVision, wantEntropy) {
+  const mem = getVariantMemory(model, wantEntropy);
   if (!mem) return null;
+
+  const platform = document.getElementById('platform').value;
+  const isApu = platform === 'apu';
+
+  // On APU/integrated, GPU weights move to system RAM
+  const gpuWeights = isApu ? 0 : mem.gpu_weights_mib;
+  const ramWeights = isApu ? mem.gpu_weights_mib + mem.ram_weights_mib : mem.ram_weights_mib;
 
   const kvRaw = mem.kv_per_100k_mib * (ctx / 100000);
   const kvWithEntropy = kvRaw * (1 - mem.entropy_savings_pct / 100);
   const mmprojMib = (wantVision && model.has_vision) ? mem.vision_mmproj_mib : 0;
 
   return {
-    total: mem.gpu_weights_mib + kvWithEntropy + mmprojMib + mem.overhead_mib,
-    weights: mem.gpu_weights_mib,
+    total: gpuWeights + kvWithEntropy + mmprojMib + mem.overhead_mib,
+    weights: gpuWeights,
     kvCache: kvWithEntropy,
     mmproj: mmprojMib,
     overhead: mem.overhead_mib,
-    ramWeights: mem.ram_weights_mib,
+    ramWeights: ramWeights,
     entropyPct: mem.entropy_savings_pct
   };
 }
 
 function getViableModels(vramMib, ramGb, wantVision) {
   return MODELS
-    .filter(m => {
-      // Use variant's min VRAM if available, else model default
-      const v = getVariant(m);
-      const minVram = v ? v.min_vram_mib : m.min_vram_mib;
-      return ramGb >= m.min_ram_gb && vramMib >= minVram;
-    })
+    .filter(m => ramGb >= m.min_ram_gb)
     .filter(m => !wantVision || m.has_vision);
 }
 
@@ -498,13 +567,17 @@ function getActiveModel() {
 // ─────────────────────────────────────────────────
 function buildModelCard(model, vramMib, vision, selected) {
   const ctx = getContextForModel(model, vramMib);
-  const est = estimateVram(model, ctx, vision);
-  const isCpuOnly = est && est.weights === 0;
+  const est = estimateVram(model, ctx, vision, isEntropyEnabled());
+  const platform = document.getElementById('platform').value;
+  const isApu = platform === 'apu';
+  const isCpuOnly = est && (est.weights === 0 || isApu);
   let fitClass, fitLabel;
   if (isCpuOnly) {
-    // CPU-only models don't use GPU — always fit on VRAM
-    fitClass = 'badge-green';
-    fitLabel = 'Fits';
+    // CPU-only / APU: check fit against system RAM
+    const totalRam = parseInt(document.getElementById('ram').value) * 1000;
+    const fitsRam = est && est.ramWeights <= totalRam * 0.95;
+    fitClass = fitsRam ? 'badge-green' : 'badge-red';
+    fitLabel = fitsRam ? 'Fits' : 'Over';
   } else {
     const freeMib = est ? vramMib - est.total : 0;
     const fitTight = freeMib >= 0 && est && est.total > vramMib * 0.95;
@@ -578,8 +651,9 @@ function toggleQuantMenu(modelId) {
   model.variants.forEach(v => {
     const isCurrent = (getVariant(model) || model.variants[0]).quant === v.quant;
     // Quick memory check for this variant
+    const kvMult = (model.entropy_profile && isEntropyEnabled()) ? 0.7 : 1.0;
     const mem = {
-      total: v.gpu_weights_mib + (v.kv_per_100k_mib * (ctx / 100000) * 0.7) + (vision && model.has_vision ? 887 : 0) + (v.overhead_mib || 400),
+      total: v.gpu_weights_mib + (v.kv_per_100k_mib * (ctx / 100000) * kvMult) + (vision && model.has_vision ? 887 : 0) + (v.overhead_mib || 400),
       file_gb: v.file_gb
     };
     const fits = mem.total <= vramMib;
@@ -739,7 +813,8 @@ function renderModelSelector() {
   container.innerHTML = buildModelCard(active, vramMib, vision, true);
 
   const btn = document.getElementById('model-dropdown-btn');
-  if (btn) btn.style.display = viable.length > 1 ? 'flex' : 'none';
+  // Hide switch button if only one model to offer
+  if (btn) btn.style.display = viable.length > 1 ? '' : 'none';
 }
 
 // ─────────────────────────────────────────────────
@@ -754,32 +829,41 @@ function renderMemoryBreakdown() {
   }
 
   const vramGb = parseInt(document.getElementById('gpu').value);
+  const platform = document.getElementById('platform').value;
+  const rawVram = platform === 'apu' ? 0 : vramGb * 1000;
   const vramMib = getEffectiveVram();
+  const systemOverhead = platform !== 'apu' ? rawVram - vramMib : 0;
   const ram = parseInt(document.getElementById('ram').value);
   const vision = document.getElementById('vision').value === '1';
   const ctx = getContextForModel(model, vramMib);
-  const est = estimateVram(model, ctx, vision);
+  const est = estimateVram(model, ctx, vision, isEntropyEnabled());
   if (!est) { document.getElementById('memory-card').classList.add('hidden'); return; }
 
   document.getElementById('memory-card').classList.remove('hidden');
 
-  // CPU-only mode: show RAM breakdown only
-  if (est.weights === 0) {
+  // CPU-only mode or APU/integrated: show RAM breakdown only
+  const isApuMem = platform === 'apu';
+  if (est.weights === 0 || isApuMem) {
     const ramUsed = est.ramWeights;
-    const ramFree = ram * 1000 - Math.max(ramUsed, 2000);
+    const fullRam = ram * 1000;
+    const osKey = document.getElementById('os').value;
+    const sysReserve = osKey.startsWith('linux') ? 3000 : 4000;
+    const ramFree = fullRam - sysReserve - Math.max(ramUsed, 2000);
     document.getElementById('memory-usage').innerHTML = '<p style="color:var(--text-muted);margin-bottom:0.75rem">' +
       '🧠 No dedicated GPU — model runs entirely on CPU.</p>' +
-      '<table class="mem-table"><tr><td colspan="3" class="mem-table-title">System RAM &mdash; ' + ram + ' GB total</td></tr>' +
-      '<tr><td><span class="mem-dot" style="background:#58a6ff"></span> Model weights</td><td class="mem-num">' + Math.round(ramUsed).toLocaleString() + ' MiB</td><td class="mem-pct">' + Math.round(ramUsed / (ram * 1000) * 100) + '%</td></tr>' +
-      '<tr><td><span class="mem-dot" style="background:#3fb950"></span> KV cache + buffers</td><td class="mem-num">' + Math.round(est.kvCache + est.overhead).toLocaleString() + ' MiB</td><td class="mem-pct">' + Math.round((est.kvCache + est.overhead) / (ram * 1000) * 100) + '%</td></tr>' +
-      '<tr><td><span class="mem-dot" style="background:#30363d"></span> System &amp; free</td><td class="mem-num">' + Math.round(ramFree).toLocaleString() + ' MiB</td><td class="mem-pct">' + Math.round(ramFree / (ram * 1000) * 100) + '%</td></tr>' +
+      '<table class="mem-table"><tr><td colspan="3" class="mem-table-title">System RAM &mdash; ' + ram + ' GB total (' + sysReserve.toLocaleString() + ' MiB reserved by OS)</td></tr>' +
+      '<tr><td><span class="mem-dot" style="background:#7a3b8e"></span> OS / display reservation</td><td class="mem-num">' + sysReserve.toLocaleString() + ' MiB</td><td class="mem-pct">' + Math.round(sysReserve / fullRam * 100) + '%</td></tr>' +
+      '<tr><td><span class="mem-dot" style="background:#58a6ff"></span> Model weights</td><td class="mem-num">' + Math.round(ramUsed).toLocaleString() + ' MiB</td><td class="mem-pct">' + Math.round(ramUsed / fullRam * 100) + '%</td></tr>' +
+      '<tr><td><span class="mem-dot" style="background:#3fb950"></span> KV cache + buffers</td><td class="mem-num">' + Math.round(est.kvCache + est.overhead).toLocaleString() + ' MiB</td><td class="mem-pct">' + Math.round((est.kvCache + est.overhead) / fullRam * 100) + '%</td></tr>' +
+      '<tr><td><span class="mem-dot" style="background:#30363d"></span> System &amp; free</td><td class="mem-num">' + Math.round(ramFree).toLocaleString() + ' MiB</td><td class="mem-pct">' + Math.round(ramFree / fullRam * 100) + '%</td></tr>' +
       '</table>' +
-      '<p class="mem-note">⚡ CPU inference is slower than GPU. Use BLAS acceleration for best CPU performance.</p>';
+      '<p class="mem-note">⚡ CPU inference is slower than GPU. Use BLAS acceleration for best CPU performance.</p>' +
+      '<p class="mem-note">💡 Integrated GPU shares this memory. The OS reservation keeps ~' + sysReserve.toLocaleString() + ' MiB for display and background tasks.</p>';
     return;
   }
 
   const freeVram = vramMib - est.total;
-  const pct = (val) => vramMib > 0 ? Math.round((val / vramMib) * 100) : 0;
+  const pct = (val) => rawVram > 0 ? Math.round((val / rawVram) * 100) : 0;
 
   const segments = [
     { label: 'Model weights (GPU)', mib: est.weights, color: '#58a6ff' },
@@ -787,7 +871,8 @@ function renderMemoryBreakdown() {
     { label: 'Overhead / buffers', mib: est.overhead, color: '#d29922' }
   ];
   if (est.mmproj > 0) segments.push({ label: 'Vision encoder', mib: est.mmproj, color: '#f0883e' });
-  if (freeVram > 10 && vramMib > 0) segments.push({ label: 'Free VRAM', mib: Math.max(0, freeVram), color: '#30363d' });
+  if (systemOverhead > 10) segments.push({ label: 'GPU system reservation', mib: systemOverhead, color: '#7a3b8e' });
+  if (freeVram > 10 && rawVram > 0) segments.push({ label: 'Free VRAM', mib: Math.max(0, freeVram), color: '#30363d' });
 
   const totalBar = segments.reduce((s, seg) => s + seg.mib, 0);
   const barHtml = `<div class="mem-bar">${segments.map(seg =>
@@ -795,13 +880,13 @@ function renderMemoryBreakdown() {
   ).join('')}</div>`;
 
   const tableHtml = `<table class="mem-table">
-    <tr><td colspan="3" class="mem-table-title">GPU VRAM — ${vramMib.toLocaleString()} MiB total</td></tr>
+    <tr><td colspan="3" class="mem-table-title">GPU VRAM — ${rawVram.toLocaleString()} MiB total${systemOverhead > 10 ? ` (${systemOverhead.toLocaleString()} MiB reserved by OS)` : ""}</td></tr>
     ${segments.map(seg => `<tr>
       <td><span class="mem-dot" style="background:${seg.color}"></span> ${seg.label}</td>
       <td class="mem-num">${Math.round(seg.mib).toLocaleString()} MiB</td>
       <td class="mem-pct">${pct(seg.mib)}%</td>
     </tr>`).join('')}
-    <tr class="mem-total"><td>Used</td><td class="mem-num">${Math.round(est.total).toLocaleString()} MiB</td><td class="mem-pct">${pct(est.total)}%</td></tr>
+    <tr class="mem-total"><td>Used</td><td class="mem-num">${Math.round(est.total + systemOverhead).toLocaleString()} MiB</td><td class="mem-pct">${pct(est.total + systemOverhead)}%</td></tr>
   </table>`;
 
   const ramUsed = est.ramWeights;
@@ -814,9 +899,11 @@ function renderMemoryBreakdown() {
   const modelNote = model.cpu_moe
     ? `<p class="mem-note">🧠 MoE mode: dense layers (${Math.round(est.weights).toLocaleString()} MiB) on GPU. Expert weights (${Math.round(est.ramWeights).toLocaleString()} MiB) in system RAM via <code>--n-cpu-moe</code>.</p>`
     : '';
-  const note = model.entropy_profile
+  const note = (model.entropy_profile && isEntropyEnabled())
     ? `<p class="mem-note">📉 Entropy Path B active: KV cache reduced by ~${est.entropyPct}%.</p>`
-    : '';
+    : model.entropy_profile
+      ? `<p class="mem-note">📉 Entropy Path B available but <strong>disabled</strong>. Enable it for ~30% less KV cache.</p>`
+      : '';
 
   document.getElementById('memory-usage').innerHTML = barHtml + tableHtml + ramHtml + modelNote + note;
 }
@@ -828,10 +915,10 @@ function buildCmd(model, ctx, wantVision) {
   const osKey = document.getElementById('os').value;
   const osInfo = OS_CONFIG[osKey];
   const md = osInfo ? osInfo.modelDir : '~/AI/models/';
+  const platform = document.getElementById('platform').value;
+  const isApu = platform === 'apu';
 
   const f = md + getVariantFile(model);
-  const cpuMoe = model.cpu_moe
-    ? (ctx > model.cpu_moe_threshold ? model.cpu_moe_high : model.cpu_moe_low) : '';
 
   const flags = [];
   flags.push('llama-server', '-m', f);
@@ -839,14 +926,19 @@ function buildCmd(model, ctx, wantVision) {
     flags.push('--mmproj', md + model.mmproj, '--no-mmproj-offload');
   }
   flags.push('--alias', model.alias);
-  flags.push('-ngl', String(model.ngl));
-  if (model.cpu_moe) flags.push('--n-cpu-moe', String(cpuMoe));
-  flags.push('--ctx-size', String(ctx));
-  flags.push('--flash-attn', 'on');
-  flags.push('-ctk', 'q8_0', '-ctv', 'turbo3_0');
-  if (model.entropy_profile) {
-    flags.push('--entropy-profile', model.entropy_profile, '--entropy-prune-ratio', '2.0');
+  if (!isApu) {
+    // GPU-specific flags
+    const cpuMoe = model.cpu_moe
+      ? (ctx > model.cpu_moe_threshold ? model.cpu_moe_high : model.cpu_moe_low) : '';
+    flags.push('-ngl', String(model.ngl));
+    if (model.cpu_moe) flags.push('--n-cpu-moe', String(cpuMoe));
+    flags.push('--flash-attn', 'on');
+    flags.push('-ctk', 'q8_0', '-ctv', 'turbo3_0');
+    if (model.entropy_profile && isEntropyEnabled()) {
+      flags.push('--entropy-profile', model.entropy_profile, '--entropy-prune-ratio', '2.0');
+    }
   }
+  flags.push('--ctx-size', String(ctx));
   flags.push('--host', '127.0.0.1', '--port', '8080');
 
   return flags.join(' ');
@@ -905,6 +997,10 @@ function updateCommand() {
 
   const cmdText = buildCmd(model, ctx, vision);
   renderCommandText('command', cmdText);
+
+  // Update context size display
+  const ctxDisplay = document.getElementById('ctx-display');
+  if (ctxDisplay) ctxDisplay.textContent = (ctx / 1000).toFixed(0) + 'K';
 
   // Update model path note for current OS
   const osKey = document.getElementById('os').value;
