@@ -1,10 +1,24 @@
 #!/usr/bin/env bash
 # Mostlysane Local AI — One-liner installer
-# curl -sSL https://lyndonblack.github.io/MostlysaneAI/install/install.sh | bash
+# Usage: curl -sSL https://lyndonblack.github.io/MostlysaneAI/install/install.sh | bash
+#        curl -sSL https://lyndonblack.github.io/MostlysaneAI/install/install.sh | bash -s -- --model Ministral-3-3B-Q5_K_L.gguf
 set -euo pipefail
 
 REPO="https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git"
 MODEL_REPO="https://huggingface.co/LyndonBlack"
+
+# Default model if none specified
+DEFAULT_MODEL="Qwen3.6-35B-A3B-Q5_K_M.gguf"
+MODEL="$DEFAULT_MODEL"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model) MODEL="$2"; shift 2 ;;
+    --help) echo "Usage: $0 [--model <gguf-filename>]"; exit 0 ;;
+    *) echo "Unknown option: $1"; exit 1 ;;
+  esac
+done
 
 echo "┌─────────────────────────────────────────┐"
 echo "│  🦄 Mostlysane Local AI Installer       │"
@@ -75,16 +89,20 @@ mkdir -p "$MODEL_DIR"
 echo ""
 echo "┌─────────────────────────────────────────┐"
 echo "│  📥 Model Download                      │"
-echo "│  Recommended: Qwen3.6 35B A3B (20 GB)   │"
 echo "└─────────────────────────────────────────┘"
 echo ""
-echo "Models are available at: https://huggingface.co/LyndonBlack"
-echo ""
-read -rp "Download the recommended model? (~20 GB, takes a while) [y/N] " REPLY
+
+# Ask to download the selected/requested model
+MODEL_SIZE_DESC=""
+if echo "$MODEL" | grep -qi "qwen3.6.*35b"; then
+  MODEL_SIZE_DESC=" (~20 GB, takes a while)"
+fi
+
+read -rp "Download ${MODEL}${MODEL_SIZE_DESC}? [y/N] " REPLY </dev/tty
 if [[ "$REPLY" =~ ^[Yy]$ ]]; then
-  echo "Downloading Qwen3.6-35B-A3B-Q5_K_M.gguf..."
-  curl -L -o "$MODEL_DIR/Qwen3.6-35B-A3B-Q5_K_M.gguf" \
-    "https://huggingface.co/LyndonBlack/Qwen3.6-35B-A3B-Q5_K_M.gguf"
+  echo "Downloading ${MODEL}..."
+  curl -L -o "$MODEL_DIR/$MODEL" \
+    "$MODEL_REPO/${MODEL%.gguf}"
   echo "✅ Model downloaded!"
 fi
 
@@ -95,9 +113,9 @@ echo "│                                          │"
 echo "│  Run your server:                        │"
 echo "│  cd $BUILD_DIR                           │"
 echo "│  ./build/bin/llama-server \\              │"
-echo "│    -m ~/AI/models/<your-model>.gguf \\    │"
+echo "│    -m ~/AI/models/${MODEL} \\             │"
 echo "│    --host 127.0.0.1 --port 8080          │"
 echo "│                                          │"
 echo "│  Or use the web app for a ready config:  │"
-echo "│  https://lyndonblack.github.io/MostlysaneAI/ │"
+echo "│  https://ai.mostlysane.co.nz/            │"
 echo "└─────────────────────────────────────────┘"
