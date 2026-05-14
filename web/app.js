@@ -922,10 +922,11 @@ function buildCmd(model, ctx, wantVision) {
   const platform = document.getElementById('platform').value;
   const isApu = platform === 'apu';
 
+  const BINARY = '~/AI/llama.cpp-Ternary-1.58Bit-and-TurboQuant/build/bin/llama-server';
   const f = md + getVariantFile(model);
 
   const flags = [];
-  flags.push('llama-server', '-m', f);
+  flags.push(BINARY, '-m', f);
   if (wantVision && model.has_vision) {
     flags.push('--mmproj', md + model.mmproj, '--no-mmproj-offload');
   }
@@ -952,7 +953,7 @@ function buildCmd(model, ctx, wantVision) {
 function buildCalibrateCmd(model) {
   if (!model.entropy_profile) return '';
   const file = getVariantFile(model);
-  return './build/bin/llama-entropy-calibrate -m ~/AI/models/' + file + ' -ngl ' + model.ngl + ' -c 4096 -b 4096';
+  return '~/AI/llama.cpp-Ternary-1.58Bit-and-TurboQuant/build/bin/llama-entropy-calibrate -m ~/AI/models/' + file + ' -ngl ' + model.ngl + ' -c 4096 -b 4096';
 }
 
 
