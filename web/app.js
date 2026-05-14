@@ -967,7 +967,7 @@ function updateConfig() {
 // ─────────────────────────────────────────────────
 function openCompare() {
   var frame = document.getElementById('compare-frame');
-  if (frame) frame.src = 'demos/';
+  if (frame) frame.src = 'demos/comparison.html';
   var modal = document.getElementById('compare-modal');
   if (modal) modal.classList.add('open');
   document.body.style.overflow = 'hidden';
