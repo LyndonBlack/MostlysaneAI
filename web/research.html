@@ -5,10 +5,37 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Research — Mostlysane AI</title>
 <link rel="stylesheet" href="style.css">
-<style>body{padding:2rem 1rem;max-width:800px;margin:0 auto}nav{margin-bottom:2rem}nav a{color:var(--accent);text-decoration:none;font-size:0.9rem}</style>
+<style>
+body { padding-top: calc(2rem + 56px); max-width: 800px; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; }
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(13,17,23,0.92); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1.5rem; height: 56px;
+}
+nav .logo { font-size: 1.1rem; font-weight: 700; color: var(--text); text-decoration: none; }
+nav .logo span { color: var(--accent); }
+nav .links { display: flex; gap: 0.5rem; }
+nav .links a {
+  color: var(--text-muted); text-decoration: none; font-size: 0.85rem;
+  padding: 0.4rem 0.7rem; border-radius: 6px; transition: 0.15s;
+}
+nav .links a:hover { color: var(--text); background: var(--card); }
+nav .links a.active { color: var(--accent); }
+</style>
 </head>
 <body>
-<nav><a href="/">← Home</a></nav>
+<nav>
+  <a href="/" class="logo">Mostlysane <span>AI</span></a>
+  <div class="links">
+    <a href="/">Home</a>
+    <a href="getstarted.html">Get Started</a>
+    <a href="demos/">Demos</a>
+    <a href="research.html" class="active">Research</a>
+    <a href="about.html">About</a>
+  </div>
+</nav>
 <h1>Research <span>Overview</span></h1>
 <p class="subtitle">Technical deep-dives on the Mostlysane AI research stack — coming soon.</p>
 <div class="card">
