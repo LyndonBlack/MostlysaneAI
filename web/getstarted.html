@@ -5,8 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mostlysane — Local AI Config Generator</title>
 <link rel="stylesheet" href="style.css">
+<style>
+body { padding-top: calc(2rem + 56px); }
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(13,17,23,0.92); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1.5rem; height: 56px;
+}
+nav .logo { font-size: 1.1rem; font-weight: 700; color: var(--text); text-decoration: none; }
+nav .logo span { color: var(--accent); }
+nav .links { display: flex; gap: 0.5rem; }
+nav .links a {
+  color: var(--text-muted); text-decoration: none; font-size: 0.85rem;
+  padding: 0.4rem 0.7rem; border-radius: 6px; transition: 0.15s;
+}
+nav .links a:hover { color: var(--text); background: var(--card); }
+nav .links a.active { color: var(--accent); }
+</style>
 </head>
 <body>
+<nav>
+  <a href="/" class="logo">Mostlysane <span>AI</span></a>
+  <div class="links">
+    <a href="/">Home</a>
+    <a href="getstarted.html" class="active">Get Started</a>
+    <a href="demos/">Demos</a>
+    <a href="research.html">Research</a>
+    <a href="about.html">About</a>
+  </div>
+</nav>
 <h1>Mostlysane <span>AI</span></h1>
 <p class="subtitle">Get working on real work with local AI. Don't go crazy over AI. Stay Mostlysane.</p>
 
