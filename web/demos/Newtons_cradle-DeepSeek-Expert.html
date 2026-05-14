@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newton's Cradle</title>
+    <style>
+        :root {
+            --bg: #f0f0ee;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #e8e6e1 0%, #f5f4f0 30%, #eae8e2 100%);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+        }
+
+        .container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 900px;
+            padding: 20px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            max-width: 850px;
+            border-radius: 16px;
+            filter: drop-shadow(0 4px 24px rgba(0, 0, 0, 0.10));
+        }
+
+        .caption {
+            margin-top: 16px;
+            font-size: 0.85rem;
+            color: #999;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="cradleCanvas" aria-label="Newton's Cradle Animation"></canvas>
+        <p class="caption">Newton's Cradle &mdash; Conservation of Momentum</p>
+    </div>
+
+    <script>
+        (function() {
+            // ─────────────────────────────────────
+            // DOM REFERENCE
+            // ─────────────────────────────────────
+            const canvas = document.getElementById('cradleCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // ─────────────────────────────────────
+            // NAMED CONSTANTS
+            // ─────────────────────────────────────
+            const NUM_BALLS = 5; // Total number of balls
+            const BALL_RADIUS_RATIO = 0.055; // Ball radius as ratio of canvas width
+            const STRING_LENGTH_RATIO = 0.52; // String length as ratio of canvas height
+            const MAX_ANGLE_DEG = 26; // Maximum swing angle in degrees
+            const QUARTER_SWING_DURATION = 0.62; // Duration of one quarter-swing in seconds
+            const IMPACT_VIBRATION_DECAY = 0.72; // Decay factor per frame for impact vibration
+            const IMPACT_VIBRATION_AMPLITUDE = 2.8; // Max pixel displacement of middle balls on impact
+            const FRAME_POST_INSET_RATIO = 0.08; // Frame post inset from edges
+
+            // Derived
+            const MAX_ANGLE = MAX_ANGLE_DEG * Math.PI / 180; // Max angle in radians
+            const FULL_CYCLE_DURATION = QUARTER_SWING_DURATION * 4; // Full animation cycle
+
+            // ─────────────────────────────────────
+            // STATE VARIABLES
+            // ─────────────────────────────────────
+            let animationTime = 0; // Accumulated animation time (seconds)
+            let lastPhaseSection = 0; // Tracks which quarter of the cycle we're in (0-3)
+            let impactVibration = 0; // Current vibration amplitude (decays after impact)
+            let prevTimestamp = null; // For delta-time calculation
+
+            // Computed per-frame values (recalculated on resize)
+            let canvasWidth, canvasHeight;
+            let ballRadius, stringLength;
+            let pivotY, restY;
+            let pivotSpacing;
+            let centerX;
+            let pivotPoints = []; // Array of {x, y} for each ball's pivot
+
+            // ─────────────────────────────────────
+            // RESIZE / LAYOUT CALCULATION
+            // ─────────────────────────────────────
+            function recalculateLayout() {
+                const containerWidth = canvas.parentElement.clientWidth - 40;
+                const targetWidth = Math.min(containerWidth, 850);
+                const aspectRatio = 850 / 520; // Internal design aspect ratio
+                canvasWidth = Math.floor(targetWidth);
+                canvasHeight = Math.floor(targetWidth / aspectRatio);
+
+                // Set actual canvas pixel dimensions
+                canvas.width = canvasWidth;
+                canvas.height = canvasHeight;
+
+                // Compute derived measurements
+                ballRadius = Math.round(canvasWidth * BALL_RADIUS_RATIO);
+                stringLength = Math.round(canvasHeight * STRING_LENGTH_RATIO);
+                pivotSpacing = ballRadius * 2; // Balls just touching at rest
+                centerX = canvasWidth / 2;
+                pivotY = Math.round(canvasHeight * 0.19); // Pivot bar near top
+                restY = pivotY + stringLength; // Ball center Y at rest
+
+                // Compute pivot X positions
+                pivotPoints = [];
+                const totalSpan = (NUM_BALLS - 1) * pivotSpacing;
+                const startX = centerX - totalSpan / 2;
+                for (let i = 0; i < NUM_BALLS; i++) {
+                    pivotPoints.push({
+                        x: startX + i * pivotSpacing,
+                        y: pivotY,
+                    });
+                }
+            }
+
+            // ─────────────────────────────────────
+            // DRAWING HELPERS
+            // ─────────────────────────────────────
+
+            /** Draw a shiny metallic ball at (cx, cy) with given radius */
+            function drawBall(cx, cy, radius) {
+                // Main sphere gradient – offset highlight for 3D metallic look
+                const highlightOffsetX = -radius * 0.28;
+                const highlightOffsetY = -radius * 0.32;
+                const gradCenterX = cx + highlightOffsetX;
+                const gradCenterY = cy + highlightOffsetY;
+
+                const gradient = ctx.createRadialGradient(
+                    gradCenterX, gradCenterY, radius * 0.04,
+                    cx, cy, radius * 1.05
+                );
+                gradient.addColorStop(0.0, '#ffffff'); // Bright specular highlight
+                gradient.addColorStop(0.08, '#fafafa');
+                gradient.addColorStop(0.18, '#e8e8e8');
+                gradient.addColorStop(0.35, '#c8c8c8');
+                gradient.addColorStop(0.55, '#9a9a9a');
+                gradient.addColorStop(0.72, '#6b6b6b');
+                gradient.addColorStop(0.86, '#3d3d3d');
+                gradient.addColorStop(0.96, '#1a1a1a');
+                gradient.addColorStop(1.0, '#0d0d0d');
+
+                // Draw sphere
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+
+                // Subtle inner rim light (bottom-right reflection)
+                const rimGradient = ctx.createRadialGradient(
+                    cx + radius * 0.22, cy + radius * 0.25, radius * 0.55,
+                    cx, cy, radius
+                );
+                rimGradient.addColorStop(0.0, 'rgba(255,255,255,0)');
+                rimGradient.addColorStop(0.6, 'rgba(255,255,255,0.04)');
+                rimGradient.addColorStop(0.85, 'rgba(180,180,200,0.12)');
+                rimGradient.addColorStop(1.0, 'rgba(100,100,120,0.25)');
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fillStyle = rimGradient;
+                ctx.fill();
+
+                // Tiny secondary highlight sparkle
+                const sparkleX = cx - radius * 0.32;
+                const sparkleY = cy - radius * 0.36;
+                const sparkleGrad = ctx.createRadialGradient(
+                    sparkleX, sparkleY, 0,
+                    sparkleX, sparkleY, radius * 0.22
+                );
+                sparkleGrad.addColorStop(0.0, 'rgba(255,255,255,0.95)');
+                sparkleGrad.addColorStop(0.3, 'rgba(255,255,255,0.55)');
+                sparkleGrad.addColorStop(0.7, 'rgba(255,255,255,0.05)');
+                sparkleGrad.addColorStop(1.0, 'rgba(255,255,255,0)');
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fillStyle = sparkleGrad;
+                ctx.fill();
+            }
+
+            /** Draw a thin suspension string from (fx, fy) to (tx, ty) */
+            function drawString(fx, fy, tx, ty) {
+                ctx.beginPath();
+                ctx.moveTo(fx, fy);
+                ctx.lineTo(tx, ty);
+                ctx.strokeStyle = '#5a5a5a';
+                ctx.lineWidth = Math.max(1.0, canvasWidth * 0.0014);
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                // Subtle second pass for a slightly metallic thread look
+                ctx.beginPath();
+                ctx.moveTo(fx, fy);
+                ctx.lineTo(tx, ty);
+                ctx.strokeStyle = 'rgba(180,180,180,0.35)';
+                ctx.lineWidth = Math.max(0.5, canvasWidth * 0.0007);
+                ctx.stroke();
+            }
+
+            /** Draw a soft shadow ellipse at (sx, sy) for a ball of given radius */
+            function drawShadow(sx, sy, radius) {
+                const shadowY = restY + radius + Math.round(canvasHeight * 0.06);
+                const shadowScaleX = 0.85;
+                const shadowScaleY = 0.22;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.ellipse(sx, shadowY, radius * shadowScaleX, radius * shadowScaleY, 0, 0, Math.PI * 2);
+                const shadowGrad = ctx.createRadialGradient(
+                    sx, shadowY, radius * shadowScaleX * 0.15,
+                    sx, shadowY, radius * shadowScaleX
+                );
+                shadowGrad.addColorStop(0.0, 'rgba(0,0,0,0.22)');
+                shadowGrad.addColorStop(0.5, 'rgba(0,0,0,0.10)');
+                shadowGrad.addColorStop(1.0, 'rgba(0,0,0,0)');
+                ctx.fillStyle = shadowGrad;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            /** Draw the support frame */
+            function drawFrame() {
+                const postInset = Math.round(canvasWidth * FRAME_POST_INSET_RATIO);
+                const leftPostX = postInset;
+                const rightPostX = canvasWidth - postInset;
+                const postWidth = Math.max(6, Math.round(canvasWidth * 0.016));
+                const baseY = restY + ballRadius + Math.round(canvasHeight * 0.10);
+                const topBarY = pivotY;
+                const topBarThickness = Math.max(7, Math.round(canvasHeight * 0.025));
+                const baseThickness = Math.max(8, Math.round(canvasHeight * 0.028));
+
+                // ── Vertical posts ──
+                for (const postX of [leftPostX, rightPostX]) {
+                    const postGrad = ctx.createLinearGradient(postX, 0, postX + postWidth, 0);
+                    postGrad.addColorStop(0.0, '#3a3a3a');
+                    postGrad.addColorStop(0.25, '#5c5c5c');
+                    postGrad.addColorStop(0.5, '#6e6e6e');
+                    postGrad.addColorStop(0.7, '#525252');
+                    postGrad.addColorStop(1.0, '#2a2a2a');
+
+                    ctx.fillStyle = postGrad;
+                    ctx.fillRect(postX - postWidth / 2, topBarY - topBarThickness / 2, postWidth, baseY - topBarY +
+                        topBarThickness / 2);
+
+                    // Subtle edge highlight on posts
+                    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(postX - postWidth / 2, topBarY - topBarThickness / 2, postWidth, baseY - topBarY +
+                        topBarThickness / 2);
+                }
+
+                // ── Top horizontal bar (pivot rod) ──
+                const topBarGrad = ctx.createLinearGradient(0, topBarY - topBarThickness / 2, 0, topBarY + topBarThickness /
+                    2);
+                topBarGrad.addColorStop(0.0, '#7a7a7a');
+                topBarGrad.addColorStop(0.2, '#9a9a9a');
+                topBarGrad.addColorStop(0.45, '#b0b0b0');
+                topBarGrad.addColorStop(0.6, '#8a8a8a');
+                topBarGrad.addColorStop(0.85, '#4a4a4a');
+                topBarGrad.addColorStop(1.0, '#2e2e2e');
+
+                ctx.fillStyle = topBarGrad;
+                const topBarLeft = leftPostX - postWidth / 2;
+                const topBarRight = rightPostX + postWidth / 2;
+                const topBarWidth = topBarRight - topBarLeft;
+                ctx.fillRect(topBarLeft, topBarY - topBarThickness / 2, topBarWidth, topBarThickness);
+
+                // Top bar subtle highlight line
+                ctx.strokeStyle = 'rgba(255,255,255,0.13)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(topBarLeft, topBarY - topBarThickness / 2 + 1);
+                ctx.lineTo(topBarRight, topBarY - topBarThickness / 2 + 1);
+                ctx.stroke();
+
+                // ── Base platform ──
+                const baseGrad = ctx.createLinearGradient(0, baseY - baseThickness / 2, 0, baseY + baseThickness / 2);
+                baseGrad.addColorStop(0.0, '#5a5a5a');
+                baseGrad.addColorStop(0.3, '#7e7e7e');
+                baseGrad.addColorStop(0.55, '#8c8c8c');
+                baseGrad.addColorStop(0.8, '#555555');
+                baseGrad.addColorStop(1.0, '#2a2a2a');
+
+                const baseLeft = leftPostX - postWidth / 2 - Math.round(canvasWidth * 0.03);
+                const baseRight = rightPostX + postWidth / 2 + Math.round(canvasWidth * 0.03);
+                ctx.fillStyle = baseGrad;
+                ctx.fillRect(baseLeft, baseY - baseThickness / 2, baseRight - baseLeft, baseThickness);
+
+                // Base top highlight
+                ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(baseLeft, baseY - baseThickness / 2 + 1);
+                ctx.lineTo(baseRight, baseY - baseThickness / 2 + 1);
+                ctx.stroke();
+
+                // ── Small feet / corner details ──
+                const footWidth = Math.round(canvasWidth * 0.025);
+                const footHeight = Math.round(baseThickness * 0.55);
+                for (const footX of [baseLeft + footWidth, baseRight - footWidth]) {
+                    ctx.fillStyle = '#1f1f1f';
+                    ctx.fillRect(footX - footWidth / 2, baseY + baseThickness / 2, footWidth, footHeight);
+                    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                    ctx.fillRect(footX - footWidth / 2, baseY + baseThickness / 2, footWidth, 2);
+                }
+            }
+
+            // ─────────────────────────────────────
+            // PHYSICS / ANIMATION LOGIC
+            // ─────────────────────────────────────
+
+            /**
+             * Compute the angle for each of the 5 balls based on the current animation time.
+             * Returns an array of 5 angles (in radians). Positive = right, negative = left.
+             * 
+             * The full cycle is divided into 4 quarter-swings:
+             *   Section 0: Left ball (index 0) swings inward from -MAX_ANGLE to 0
+             *   Section 1: Right ball (index 4) swings outward from 0 to +MAX_ANGLE
+             *   Section 2: Right ball swings inward from +MAX_ANGLE to 0
+             *   Section 3: Left ball swings outward from 0 to -MAX_ANGLE
+             * 
+             * Impacts occur at section transitions 0→1 and 2→3.
+             */
+            function computeBallAngles(currentTime) {
+                // Wrap time into the full cycle
+                const cycleTime = currentTime % FULL_CYCLE_DURATION;
+                const quarterDur = QUARTER_SWING_DURATION;
+                const section = Math.floor(cycleTime / quarterDur) % 4;
+                const localPhase = (cycleTime - section * quarterDur) / quarterDur; // 0 to 1 within section
+
+                // Update impact detection
+                if (section !== lastPhaseSection) {
+                    // Impact occurs at section transitions 0→1 and 2→3
+                    if ((lastPhaseSection === 0 && section === 1) || (lastPhaseSection === 2 && section === 3)) {
+                        impactVibration = IMPACT_VIBRATION_AMPLITUDE;
+                    }
+                    lastPhaseSection = section;
+                }
+
+                // Initialize all angles to 0
+                const angles = new Array(NUM_BALLS).fill(0);
+
+                // Compute the active ball's angle based on the current section
+                // Using sinusoidal easing for realistic pendulum motion
+                const halfPi = Math.PI / 2;
+                let activeAngle = 0;
+
+                switch (section) {
+                    case 0:
+                        // Left ball swings inward: angle goes from -MAX_ANGLE to 0
+                        // Use cosine: cos(0)=1 → cos(π/2)=0, so angle = -MAX_ANGLE * cos(localPhase * π/2)
+                        activeAngle = -MAX_ANGLE * Math.cos(localPhase * halfPi);
+                        angles[0] = activeAngle;
+                        break;
+                    case 1:
+                        // Right ball swings outward: angle goes from 0 to +MAX_ANGLE
+                        // Use sine: sin(0)=0 → sin(π/2)=1, so angle = MAX_ANGLE * sin(localPhase * π/2)
+                        activeAngle = MAX_ANGLE * Math.sin(localPhase * halfPi);
+                        angles[NUM_BALLS - 1] = activeAngle;
+                        break;
+                    case 2:
+                        // Right ball swings inward: angle goes from +MAX_ANGLE to 0
+                        // Use cosine: cos(0)=1 → cos(π/2)=0, so angle = MAX_ANGLE * cos(localPhase * π/2)
+                        activeAngle = MAX_ANGLE * Math.cos(localPhase * halfPi);
+                        angles[NUM_BALLS - 1] = activeAngle;
+                        break;
+                    case 3:
+                        // Left ball swings outward: angle goes from 0 to -MAX_ANGLE
+                        // Use sine: sin(0)=0 → sin(π/2)=1, so angle = -MAX_ANGLE * sin(localPhase * π/2)
+                        activeAngle = -MAX_ANGLE * Math.sin(localPhase * halfPi);
+                        angles[0] = activeAngle;
+                        break;
+                }
+
+                // Apply subtle impact vibration to middle balls (indices 1, 2, 3)
+                if (impactVibration > 0.05) {
+                    const vib = impactVibration;
+                    // Ball 1 gets pushed slightly right, ball 3 slightly left, ball 2 stays centered
+                    // This simulates the compression wave through the stationary balls
+                    angles[1] = vib * 0.018; // subtle rightward nudge
+                    angles[2] = vib * -0.004; // very tiny opposite
+                    angles[3] = -vib * 0.018; // subtle leftward nudge
+                }
+
+                return angles;
+            }
+
+            // ─────────────────────────────────────
+            // MAIN RENDER FUNCTION
+            // ─────────────────────────────────────
+            function render(timestamp) {
+                // Calculate delta time
+                if (prevTimestamp === null) {
+                    prevTimestamp = timestamp;
+                }
+                let dt = (timestamp - prevTimestamp) / 1000; // Convert to seconds
+                if (dt <= 0) dt = 0.016; // Default to ~60fps if dt is invalid
+                if (dt > 0.1) dt = 0.1; // Cap to prevent jumps on tab switch
+
+                // Update animation time
+                animationTime += dt;
+
+                // Decay impact vibration
+                if (impactVibration > 0.02) {
+                    impactVibration *= IMPACT_VIBRATION_DECAY;
+                    if (impactVibration < 0.02) impactVibration = 0;
+                } else {
+                    impactVibration = 0;
+                }
+
+                // Compute ball angles
+                const angles = computeBallAngles(animationTime);
+
+                // Clear canvas
+                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+                // Draw subtle background radial glow behind the cradle
+                const bgGlow = ctx.createRadialGradient(centerX, restY, ballRadius * 2, centerX, restY, canvasWidth *
+                    0.7);
+                bgGlow.addColorStop(0.0, 'rgba(200,195,185,0.18)');
+                bgGlow.addColorStop(1.0, 'rgba(200,195,185,0)');
+                ctx.fillStyle = bgGlow;
+                ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+                // Draw frame
+                drawFrame();
+
+                // Compute ball positions and draw shadows first (behind balls)
+                const ballPositions = [];
+                for (let i = 0; i < NUM_BALLS; i++) {
+                    const angle = angles[i];
+                    const px = pivotPoints[i].x;
+                    const py = pivotPoints[i].y;
+                    // Ball center position using pendulum geometry
+                    const bx = px + stringLength * Math.sin(angle);
+                    const by = py + stringLength * Math.cos(angle);
+                    ballPositions.push({ x: bx, y: by, angle: angle });
+                }
+
+                // Draw shadows
+                for (let i = 0; i < NUM_BALLS; i++) {
+                    drawShadow(ballPositions[i].x, ballPositions[i].y, ballRadius);
+                }
+
+                // Draw strings
+                for (let i = 0; i < NUM_BALLS; i++) {
+                    const px = pivotPoints[i].x;
+                    const py = pivotPoints[i].y;
+                    const bx = ballPositions[i].x;
+                    const by = ballPositions[i].y;
+                    const angle = ballPositions[i].angle;
+                    // String attaches to top of ball
+                    const topX = bx - ballRadius * Math.sin(angle);
+                    const topY = by - ballRadius * Math.cos(angle);
+                    drawString(px, py, topX, topY);
+                }
+
+                // Draw balls (front-to-back doesn't matter much since they're in a line,
+                // but draw middle balls first, then outer ones for slight depth)
+                const drawOrder = [2, 1, 3, 0, 4]; // Middle first, then outward
+                for (const idx of drawOrder) {
+                    const pos = ballPositions[idx];
+                    drawBall(pos.x, pos.y, ballRadius);
+                }
+
+                // Update timestamp for next frame
+                prevTimestamp = timestamp;
+
+                // Request next frame
+                requestAnimationFrame(render);
+            }
+
+            // ─────────────────────────────────────
+            // INITIALIZATION
+            // ─────────────────────────────────────
+            function init() {
+                recalculateLayout();
+                // Reset state
+                animationTime = 0;
+                lastPhaseSection = 0;
+                impactVibration = 0;
+                prevTimestamp = null;
+                // Start animation loop
+                requestAnimationFrame(render);
+            }
+
+            // Handle window resize
+            let resizeTimeout;
+            function handleResize() {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    recalculateLayout();
+                    // Reset animation smoothly
+                    animationTime = animationTime % FULL_CYCLE_DURATION;
+                    lastPhaseSection = Math.floor((animationTime % FULL_CYCLE_DURATION) / QUARTER_SWING_DURATION) % 4;
+                }, 200);
+            }
+
+            window.addEventListener('resize', handleResize);
+            window.addEventListener('orientationchange', handleResize);
+
+            // Kick everything off
+            init();
+        })();
+    </script>
+</body>
+</html>

@@ -105,3 +105,19 @@ Gemini Pro 3.1 - coded for 3.1 minutes
 - Shadows move correctly, but were supposted to be subtle and are very bold, the shadows appear in midair above the base of the cradle.
 - Visual appearance is is very good, apart from the show placement
 - if the shadows were right this would be the winner
+
+DeepSeek Expert mode Deep thing enabled - Reasoned for 2 minutes, deep thinking 4 minutes - Coding 2 minutes
+- File Newtons_cradle-DeepSeek-Expert.html
+- Pass - A-
+- balls and strings correctly connected
+- physics impact and the jiggle seem good. Central 3 balls react to impact but glitch/crop slightly threw each other
+- Shadows move correctly but are floating above the base so shadows in the air
+- Visual appearance is very good apart from the shadows
+
+Claude Opus 4.7 Max - 4 minutes
+- File Newtons_cradle-Claude-Opus-4_7-Max.html
+- Pass - A-
+- balls and strings correctly connected
+- physics impact and the jiggle seem good. Gravity and impact levels seem natural
+- Shadows move correctly but are floating above the base or are appears if lite from in front, but stand shadow falls as if lit from behind
+- Visual appearance is exceptional apart from the shadows
