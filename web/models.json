@@ -11,9 +11,9 @@
     "kv_heads": 2,
     "d_head": 256,
     "has_vision": true,
-    "arch": "MoE (30 Δ + 10 Attn)",
+    "arch": "MoE (30 \u0394 + 10 Attn)",
     "min_ram_gb": 8,
-    "min_vram_mib": 7600,
+    "min_vram_mib": 7100,
     "max_ctx": 512000,
     "ngl": 99,
     "cpu_moe": true,
@@ -22,9 +22,36 @@
     "cpu_moe_high": 40,
     "notes": "Our gold standard. 512K native context, excellent quality. The best all-rounder for most setups.",
     "variants": [
-      { "quant": "Q5_K_M", "file": "Qwen3.6-35B-A3B-Q5_K_M.gguf", "file_gb": 20, "gpu_weights_mib": 4200, "ram_weights_mib": 15800, "min_vram_mib": 7600, "kv_per_100k_mib": 550, "overhead_mib": 600 },
-      { "quant": "Q4_K_M", "file": "Qwen3.6-35B-A3B-Q4_K_M.gguf", "file_gb": 17, "gpu_weights_mib": 3600, "ram_weights_mib": 13400, "min_vram_mib": 7000, "kv_per_100k_mib": 550, "overhead_mib": 600 },
-      { "quant": "Q6_K", "file": "Qwen3.6-35B-A3B-Q6_K.gguf", "file_gb": 24, "gpu_weights_mib": 5000, "ram_weights_mib": 19000, "min_vram_mib": 8000, "kv_per_100k_mib": 550, "overhead_mib": 600 }
+      {
+        "quant": "Q5_K_M",
+        "file": "Qwen3.6-35B-A3B-Q5_K_M.gguf",
+        "file_gb": 20,
+        "gpu_weights_mib": 4200,
+        "ram_weights_mib": 15800,
+        "min_vram_mib": 7100,
+        "kv_per_100k_mib": 550,
+        "overhead_mib": 600
+      },
+      {
+        "quant": "Q4_K_M",
+        "file": "Qwen3.6-35B-A3B-Q4_K_M.gguf",
+        "file_gb": 17,
+        "gpu_weights_mib": 3600,
+        "ram_weights_mib": 13400,
+        "min_vram_mib": 6500,
+        "kv_per_100k_mib": 550,
+        "overhead_mib": 600
+      },
+      {
+        "quant": "Q6_K",
+        "file": "Qwen3.6-35B-A3B-Q6_K.gguf",
+        "file_gb": 24,
+        "gpu_weights_mib": 5000,
+        "ram_weights_mib": 19000,
+        "min_vram_mib": 7500,
+        "kv_per_100k_mib": 550,
+        "overhead_mib": 600
+      }
     ]
   },
   {
@@ -39,9 +66,9 @@
     "kv_heads": 2,
     "d_head": 192,
     "has_vision": true,
-    "arch": "MoE (42 Δ + 10 Attn)",
+    "arch": "MoE (42 \u0394 + 10 Attn)",
     "min_ram_gb": 8,
-    "min_vram_mib": 7600,
+    "min_vram_mib": 7100,
     "max_ctx": 131072,
     "ngl": 99,
     "cpu_moe": true,
@@ -50,9 +77,36 @@
     "cpu_moe_high": 48,
     "notes": "Vision-native MoE. Good for image analysis but slower than Qwen3.6 (~26 t/s). Dedicated vision encoder.",
     "variants": [
-      { "quant": "Q5_K_L", "file": "Qwen_Qwen3-VL-30B-A3B-Instruct-Q5_K_L.gguf", "file_gb": 18, "gpu_weights_mib": 3800, "ram_weights_mib": 14200, "min_vram_mib": 7600, "kv_per_100k_mib": 420, "overhead_mib": 600 },
-      { "quant": "Q5_K_M", "file": "Qwen_Qwen3-VL-30B-A3B-Instruct-Q5_K_M.gguf", "file_gb": 16, "gpu_weights_mib": 3400, "ram_weights_mib": 12600, "min_vram_mib": 7000, "kv_per_100k_mib": 420, "overhead_mib": 600 },
-      { "quant": "Q4_K_M", "file": "Qwen_Qwen3-VL-30B-A3B-Instruct-Q4_K_M.gguf", "file_gb": 14, "gpu_weights_mib": 2900, "ram_weights_mib": 11100, "min_vram_mib": 6500, "kv_per_100k_mib": 420, "overhead_mib": 600 }
+      {
+        "quant": "Q5_K_L",
+        "file": "Qwen_Qwen3-VL-30B-A3B-Instruct-Q5_K_L.gguf",
+        "file_gb": 18,
+        "gpu_weights_mib": 3800,
+        "ram_weights_mib": 14200,
+        "min_vram_mib": 7100,
+        "kv_per_100k_mib": 420,
+        "overhead_mib": 600
+      },
+      {
+        "quant": "Q5_K_M",
+        "file": "Qwen_Qwen3-VL-30B-A3B-Instruct-Q5_K_M.gguf",
+        "file_gb": 16,
+        "gpu_weights_mib": 3400,
+        "ram_weights_mib": 12600,
+        "min_vram_mib": 6500,
+        "kv_per_100k_mib": 420,
+        "overhead_mib": 600
+      },
+      {
+        "quant": "Q4_K_M",
+        "file": "Qwen_Qwen3-VL-30B-A3B-Instruct-Q4_K_M.gguf",
+        "file_gb": 14,
+        "gpu_weights_mib": 2900,
+        "ram_weights_mib": 11100,
+        "min_vram_mib": 6000,
+        "kv_per_100k_mib": 420,
+        "overhead_mib": 600
+      }
     ]
   },
   {
@@ -69,16 +123,52 @@
     "has_vision": true,
     "arch": "Dense (26L, GQA=4)",
     "min_ram_gb": 8,
-    "min_vram_mib": 4000,
+    "min_vram_mib": 3500,
     "max_ctx": 131072,
     "ngl": 30,
     "cpu_moe": false,
     "notes": "Best small model. Fits entirely on GPU with 128K context. ~120 t/s, vision capable, no SWA.",
     "variants": [
-      { "quant": "Q5_K_L", "file": "mistralai_Ministral-3-3B-Instruct-2512-Q5_K_L.gguf", "file_gb": 2.4, "gpu_weights_mib": 2400, "ram_weights_mib": 0, "min_vram_mib": 4000, "kv_per_100k_mib": 3500, "overhead_mib": 400 },
-      { "quant": "Q6_K_L", "file": "mistralai_Ministral-3-3B-Instruct-2512-Q6_K_L.gguf", "file_gb": 2.8, "gpu_weights_mib": 2800, "ram_weights_mib": 0, "min_vram_mib": 4300, "kv_per_100k_mib": 3500, "overhead_mib": 400 },
-      { "quant": "Q4_K_M", "file": "mistralai_Ministral-3-3B-Instruct-2512-Q4_K_M.gguf", "file_gb": 2.0, "gpu_weights_mib": 2000, "ram_weights_mib": 0, "min_vram_mib": 3600, "kv_per_100k_mib": 3500, "overhead_mib": 400 },
-      { "quant": "Q8_0", "file": "mistralai_Ministral-3-3B-Instruct-2512-Q8_0.gguf", "file_gb": 3.6, "gpu_weights_mib": 3600, "ram_weights_mib": 0, "min_vram_mib": 5500, "kv_per_100k_mib": 3500, "overhead_mib": 400 }
+      {
+        "quant": "Q5_K_L",
+        "file": "mistralai_Ministral-3-3B-Instruct-2512-Q5_K_L.gguf",
+        "file_gb": 2.4,
+        "gpu_weights_mib": 2400,
+        "ram_weights_mib": 0,
+        "min_vram_mib": 3500,
+        "kv_per_100k_mib": 3500,
+        "overhead_mib": 400
+      },
+      {
+        "quant": "Q6_K_L",
+        "file": "mistralai_Ministral-3-3B-Instruct-2512-Q6_K_L.gguf",
+        "file_gb": 2.8,
+        "gpu_weights_mib": 2800,
+        "ram_weights_mib": 0,
+        "min_vram_mib": 3800,
+        "kv_per_100k_mib": 3500,
+        "overhead_mib": 400
+      },
+      {
+        "quant": "Q4_K_M",
+        "file": "mistralai_Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
+        "file_gb": 2.0,
+        "gpu_weights_mib": 2000,
+        "ram_weights_mib": 0,
+        "min_vram_mib": 3100,
+        "kv_per_100k_mib": 3500,
+        "overhead_mib": 400
+      },
+      {
+        "quant": "Q8_0",
+        "file": "mistralai_Ministral-3-3B-Instruct-2512-Q8_0.gguf",
+        "file_gb": 3.6,
+        "gpu_weights_mib": 3600,
+        "ram_weights_mib": 0,
+        "min_vram_mib": 5000,
+        "kv_per_100k_mib": 3500,
+        "overhead_mib": 400
+      }
     ]
   },
   {
@@ -95,15 +185,42 @@
     "has_vision": true,
     "arch": "Dense (35L, KV=1)",
     "min_ram_gb": 8,
-    "min_vram_mib": 5000,
+    "min_vram_mib": 4500,
     "max_ctx": 131072,
     "ngl": 35,
     "cpu_moe": false,
-    "notes": "Cleanest outputs tested — only 4 hallucinated lines in CodeNeedle. SWA in most layers (512t window).",
+    "notes": "Cleanest outputs tested \u2014 only 4 hallucinated lines in CodeNeedle. SWA in most layers (512t window).",
     "variants": [
-      { "quant": "Q8_0", "file": "google_gemma-4-E2B-it-Q8_0.gguf", "file_gb": 5, "gpu_weights_mib": 5000, "ram_weights_mib": 0, "min_vram_mib": 5000, "kv_per_100k_mib": 700, "overhead_mib": 400 },
-      { "quant": "Q6_K", "file": "google_gemma-4-E2B-it-Q6_K.gguf", "file_gb": 3.8, "gpu_weights_mib": 3800, "ram_weights_mib": 0, "min_vram_mib": 4200, "kv_per_100k_mib": 700, "overhead_mib": 400 },
-      { "quant": "Q5_K_M", "file": "google_gemma-4-E2B-it-Q5_K_M.gguf", "file_gb": 3.2, "gpu_weights_mib": 3200, "ram_weights_mib": 0, "min_vram_mib": 3800, "kv_per_100k_mib": 700, "overhead_mib": 400 }
+      {
+        "quant": "Q8_0",
+        "file": "google_gemma-4-E2B-it-Q8_0.gguf",
+        "file_gb": 5,
+        "gpu_weights_mib": 5000,
+        "ram_weights_mib": 0,
+        "min_vram_mib": 4500,
+        "kv_per_100k_mib": 700,
+        "overhead_mib": 400
+      },
+      {
+        "quant": "Q6_K",
+        "file": "google_gemma-4-E2B-it-Q6_K.gguf",
+        "file_gb": 3.8,
+        "gpu_weights_mib": 3800,
+        "ram_weights_mib": 0,
+        "min_vram_mib": 3700,
+        "kv_per_100k_mib": 700,
+        "overhead_mib": 400
+      },
+      {
+        "quant": "Q5_K_M",
+        "file": "google_gemma-4-E2B-it-Q5_K_M.gguf",
+        "file_gb": 3.2,
+        "gpu_weights_mib": 3200,
+        "ram_weights_mib": 0,
+        "min_vram_mib": 3300,
+        "kv_per_100k_mib": 700,
+        "overhead_mib": 400
+      }
     ]
   },
   {
@@ -120,16 +237,25 @@
     "has_vision": false,
     "arch": "MoE (ternary quant)",
     "min_ram_gb": 8,
-    "min_vram_mib": 3000,
+    "min_vram_mib": 2500,
     "max_ctx": 65535,
     "ngl": 99,
     "cpu_moe": true,
     "cpu_moe_threshold": 32000,
     "cpu_moe_low": 39,
     "cpu_moe_high": 40,
-    "notes": "Research canary — ternary quant experiment. Fast but not reliable for production apps.",
+    "notes": "Research canary \u2014 ternary quant experiment. Fast but not reliable for production apps.",
     "variants": [
-      { "quant": "Q2_0", "file": "Ternary-Bonsai-8B-Q2_0.gguf", "file_gb": 3.5, "gpu_weights_mib": 1800, "ram_weights_mib": 1700, "min_vram_mib": 3000, "kv_per_100k_mib": 550, "overhead_mib": 400 }
+      {
+        "quant": "Q2_0",
+        "file": "Ternary-Bonsai-8B-Q2_0.gguf",
+        "file_gb": 3.5,
+        "gpu_weights_mib": 1800,
+        "ram_weights_mib": 1700,
+        "min_vram_mib": 2500,
+        "kv_per_100k_mib": 550,
+        "overhead_mib": 400
+      }
     ]
   },
   {
@@ -152,7 +278,16 @@
     "cpu_moe": false,
     "notes": "Great for CPU-only or low-VRAM. ~2 GB file, decent quality, fast on modern CPUs with BLAS.",
     "variants": [
-      { "quant": "Q4_K_M", "file": "llama-3.2-3b-instruct-Q4_K_M.gguf", "file_gb": 2, "gpu_weights_mib": 0, "ram_weights_mib": 2000, "min_vram_mib": 0, "kv_per_100k_mib": 2000, "overhead_mib": 200 }
+      {
+        "quant": "Q4_K_M",
+        "file": "llama-3.2-3b-instruct-Q4_K_M.gguf",
+        "file_gb": 2,
+        "gpu_weights_mib": 0,
+        "ram_weights_mib": 2000,
+        "min_vram_mib": 0,
+        "kv_per_100k_mib": 2000,
+        "overhead_mib": 200
+      }
     ]
   },
   {
@@ -175,7 +310,16 @@
     "cpu_moe": false,
     "notes": "Strong reasoning for its size (~2.5 GB). Excellent CPU performance with BLAS acceleration.",
     "variants": [
-      { "quant": "Q4_K_M", "file": "microsoft_Phi-3.5-mini-instruct-Q4_K_M.gguf", "file_gb": 2.5, "gpu_weights_mib": 0, "ram_weights_mib": 2500, "min_vram_mib": 0, "kv_per_100k_mib": 3000, "overhead_mib": 200 }
+      {
+        "quant": "Q4_K_M",
+        "file": "microsoft_Phi-3.5-mini-instruct-Q4_K_M.gguf",
+        "file_gb": 2.5,
+        "gpu_weights_mib": 0,
+        "ram_weights_mib": 2500,
+        "min_vram_mib": 0,
+        "kv_per_100k_mib": 3000,
+        "overhead_mib": 200
+      }
     ]
   },
   {
@@ -198,7 +342,16 @@
     "cpu_moe": false,
     "notes": "Tiny but capable. ~1.5 GB, runs on any hardware. Good for quick tests and CPU-only setups.",
     "variants": [
-      { "quant": "Q8_0", "file": "Qwen2.5-1.5B-Instruct-Q8_0.gguf", "file_gb": 1.5, "gpu_weights_mib": 0, "ram_weights_mib": 1500, "min_vram_mib": 0, "kv_per_100k_mib": 2500, "overhead_mib": 200 }
+      {
+        "quant": "Q8_0",
+        "file": "Qwen2.5-1.5B-Instruct-Q8_0.gguf",
+        "file_gb": 1.5,
+        "gpu_weights_mib": 0,
+        "ram_weights_mib": 1500,
+        "min_vram_mib": 0,
+        "kv_per_100k_mib": 2500,
+        "overhead_mib": 200
+      }
     ]
   }
 ]

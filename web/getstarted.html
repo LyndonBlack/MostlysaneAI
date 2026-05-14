@@ -91,9 +91,6 @@ nav .links a.active { color: var(--accent); }
   <div class="card" id="model-card">
     <div class="card-header">
       <h2>Recommended Model</h2>
-      <button class="card-header-btn" id="model-dropdown-btn" onclick="toggleModelPanel()" title="Switch model">
-        <span class="chevron" id="model-chevron">▾</span>
-      </button>
     </div>
     <div class="usage-tier-section">
       <label for="usage-tier">Your Usage</label>
@@ -106,6 +103,16 @@ nav .links a.active { color: var(--accent); }
         <span>Deep</span>
       </div>
       <p id="usage-tier-desc" class="usage-tier-desc">Good for creative writing, code review, and general advice.</p>
+    </div>
+    <div class="model-controls">
+      <label class="entropy-toggle-label">
+        <input type="checkbox" id="entropy-toggle" checked onchange="onEntropyToggle()">
+        <span class="entropy-toggle-switch"></span>
+        <span><strong>Entropy Smart Cache</strong> — saves ~30% KV memory</span>
+      </label>
+      <button class="model-switch-btn" id="model-dropdown-btn" onclick="toggleModelPanel()" title="Switch model">
+        Switch Model <span class="chevron" id="model-chevron">▾</span>
+      </button>
     </div>
     <div id="model-selector"></div>
     <div id="model-panel" class="selector-panel hidden"></div>
@@ -124,6 +131,7 @@ nav .links a.active { color: var(--accent); }
     <h2>Command</h2>
     <div class="command-block" id="command"></div>
     <p style="margin-top:0.5rem;color:#8b949e;font-size:0.85rem">
+      Context: <code id="ctx-display"></code> tokens — auto-sized to fit your VRAM.
       Run this from your llama.cpp build directory. Models go in <code id="model-path-note">~/AI/models/</code>
       by default — put them there or edit the paths above.
     </p>
