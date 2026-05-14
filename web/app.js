@@ -119,6 +119,50 @@ const PLATFORM_CONFIG = {
 };
 
 // ─────────────────────────────────────────────────
+//  Usage tier definitions
+// ─────────────────────────────────────────────────
+const USAGE_TIERS = [
+  { id: 1, label: 'Quick Text',
+    desc: 'Best for fixing grammar, simple formatting, and rapid chat.',
+    maxContext: 16384 },
+  { id: 2, label: 'Basic Assistant',
+    desc: 'Handles short emails, simple lists, and basic definitions.',
+    maxContext: 32768 },
+  { id: 3, label: 'Everyday Smart',
+    desc: 'Good for creative writing, code review, and general advice.',
+    maxContext: 65536 },
+  { id: 4, label: 'Complex Logic',
+    desc: 'Solves harder problems, multi-step tasks, web app creation, and detailed analysis.',
+    maxContext: 999999999 },
+  { id: 5, label: 'Deep Thinker',
+    desc: 'Best for complex coding, deep reasoning, massive documents, and advanced research.',
+    maxContext: 999999999 }
+];
+
+// ─────────────────────────────────────────────────
+//  Usage tier helpers
+// ─────────────────────────────────────────────────
+function getUsageTier() {
+  const el = document.getElementById('usage-tier');
+  if (!el) return 3;
+  return parseInt(el.value) || 3;
+}
+
+function setUsageTierDesc() {
+  const el = document.getElementById('usage-tier-desc');
+  if (!el) return;
+  const tier = getUsageTier();
+  const t = USAGE_TIERS.find(x => x.id === tier) || USAGE_TIERS[2];
+  el.innerHTML = '<strong>' + t.label + ':</strong> ' + t.desc;
+}
+
+function onUsageTierChange() {
+  SELECTED_MODEL_ID = null;
+  setUsageTierDesc();
+  updateConfig();
+}
+
+// ─────────────────────────────────────────────────
 //  Effective VRAM (platform-aware)
 // ─────────────────────────────────────────────────
 function getEffectiveVram() {
@@ -128,8 +172,6 @@ function getEffectiveVram() {
   if (platform === 'apple') return Math.max(1000, vramGb * 1000 - 6000);
   return vramGb * 1000;
 }
-
-
 
 // ─────────────────────────────────────────────────
 //  State
@@ -403,10 +445,17 @@ curl -L -o ${os.modelDir}${f} ${hfUrl}</div>
 //  Estimates
 // ─────────────────────────────────────────────────
 function getContextForModel(model, vramMib) {
-  const rawGb = parseInt(document.getElementById('gpu').value);
-  if (rawGb >= 24) return model.max_ctx;
-  if (model.id === 'qwen36' || model.id === 'qwen3vl') return 200000;
-  return Math.min(model.max_ctx, 131072);
+  const tier = getUsageTier();
+  // Tiers 4 and 5 don't cap by tier — use available VRAM logic only
+  if (tier >= 4) {
+    const rawGb = parseInt(document.getElementById('gpu').value);
+    if (rawGb >= 24) return model.max_ctx;
+    if (model.id === 'qwen36' || model.id === 'qwen3vl') return 200000;
+    return Math.min(model.max_ctx, 131072);
+  }
+  // Tiers 1-3 cap by usage tier
+  const tierCtx = USAGE_TIERS.find(x => x.id === tier).maxContext;
+  return Math.min(model.max_ctx, tierCtx);
 }
 
 function estimateVram(model, ctx, wantVision) {
@@ -662,6 +711,7 @@ function renderModelSelector() {
   const vramMib = getEffectiveVram();
   const ram = parseInt(document.getElementById('ram').value);
   const vision = document.getElementById('vision').value === '1';
+  const tier = getUsageTier();
   const viable = getViableModels(vramMib, ram, vision);
   const container = document.getElementById('model-selector');
 
@@ -671,6 +721,13 @@ function renderModelSelector() {
   }
 
   if (!SELECTED_MODEL_ID || !viable.find(m => m.id === SELECTED_MODEL_ID)) {
+    // Sort by best match to usage tier: closest complexity wins
+    viable.sort(function(a, b) {
+      var da = Math.abs((a.complexity || 3) - tier);
+      var db = Math.abs((b.complexity || 3) - tier);
+      if (da !== db) return da - db;
+      return b.order - a.order; // among equal distance, prefer higher order
+    });
     SELECTED_MODEL_ID = viable[0].id;
     const m = MODELS.find(x => x.id === SELECTED_MODEL_ID);
     if (m && m.variants && !SELECTED_VARIANTS[SELECTED_MODEL_ID]) {
@@ -892,6 +949,7 @@ function updateConfig() {
   renderMemoryBreakdown();
   updateCommand();
   updateInstallGuide();
+  setUsageTierDesc();
 }
 
 // ─────────────────────────────────────────────────

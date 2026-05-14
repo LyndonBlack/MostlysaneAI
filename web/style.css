@@ -42,6 +42,76 @@ select, input {
   margin-bottom: 1rem;
 }
 select:focus, input:focus { outline: none; border-color: var(--accent); }
+
+/* ── Usage tier slider ── */
+.usage-tier-section {
+  margin-bottom: 1rem;
+  padding: 0.8rem 1rem;
+  background: #0d1117;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.usage-tier-section label {
+  margin-bottom: 0.5rem;
+  display: block;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.usage-tier-section input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 96%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  outline: none;
+  margin: 0.3rem auto 0.4rem;
+  padding: 0;
+  border: none;
+  display: block;
+}
+.usage-tier-section input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.usage-tier-section input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.usage-tier-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 9px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+.usage-tier-labels span {
+  text-align: center;
+  flex: 0 0 auto;
+}
+.usage-tier-desc {
+  font-size: 0.85rem;
+  color: var(--orange);
+  margin-top: 0.2rem;
+  text-align: center;
+  min-height: 1.5em;
+}
+.usage-tier-desc strong {
+  color: var(--text);
+}
 .badge {
   display: inline-block;
   padding: 0.2rem 0.5rem;
