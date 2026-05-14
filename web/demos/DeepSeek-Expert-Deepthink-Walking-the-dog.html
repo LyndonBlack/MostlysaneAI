@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Walking the Dog</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html,
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+            font-size: 0;
+        }
+        canvas {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="c"></canvas>
+    <script>
+        (function() {
+            const canvas = document.getElementById('c');
+            const ctx = canvas.getContext('2d');
+
+            let W, H, dpr, groundY, horizonY, bodyScale;
+            let time = 0;
+            let scrollOffset = 0;
+            const SCROLL_SPEED = 380;
+
+            function resize() {
+                dpr = Math.min(window.devicePixelRatio || 1, 2);
+                W = window.innerWidth;
+                H = window.innerHeight;
+                canvas.width = W * dpr;
+                canvas.height = H * dpr;
+                canvas.style.width = W + 'px';
+                canvas.style.height = H + 'px';
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+                groundY = H * 0.7;
+                horizonY = H * 0.42;
+                bodyScale = Math.min(W, H) / 520;
+            }
+
+            window.addEventListener('resize', resize);
+            resize();
+
+            function drawSky() {
+                const grad = ctx.createLinearGradient(0, 0, 0, horizonY);
+                grad.addColorStop(0, '#3a6fb5');
+                grad.addColorStop(0.55, '#7eb8da');
+                grad.addColorStop(0.9, '#c9e4f7');
+                grad.addColorStop(1, '#e8f0f5');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, W, horizonY);
+            }
+
+            function drawClouds() {
+                const cloudOffset = scrollOffset * 0.03;
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                const cloudPositions = [
+                    { x: 0.08, y: 0.13, w: 90, h: 36 },
+                    { x: 0.28, y: 0.07, w: 110, h: 42 },
+                    { x: 0.52, y: 0.17, w: 80, h: 30 },
+                    { x: 0.74, y: 0.09, w: 100, h: 38 },
+                    { x: 0.9, y: 0.14, w: 70, h: 28 },
+                ];
+
+                for (const c of cloudPositions) {
+                    let cx = ((c.x * W + cloudOffset) % (W + c.w * 2)) - c.w;
+                    if (cx < -c.w) cx += W + c.w * 2;
+                    const cy = c.y * H;
+                    const cw = c.w * (W / 1400);
+                    const ch = c.h * (H / 900);
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy, cw, ch, 0, 0, Math.PI * 2);
+                    ctx.ellipse(cx + cw * 0.55, cy - ch * 0.35, cw * 0.75, ch * 0.8, 0, 0, Math.PI * 2);
+                    ctx.ellipse(cx - cw * 0.4, cy - ch * 0.15, cw * 0.6, ch * 0.7, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            function drawMountains() {
+                const mtnOffset = scrollOffset * 0.08;
+                ctx.fillStyle = '#7b8ea3';
+                ctx.beginPath();
+                ctx.moveTo(0, horizonY);
+                const mtnCount = 8;
+                for (let i = -1; i <= mtnCount; i++) {
+                    const baseX = ((i / mtnCount) * W * 1.3 + mtnOffset) % (W * 1.35);
+                    const mx = baseX;
+                    const mh = (0.35 + Math.sin(i * 2.1) * 0.2 + Math.cos(i * 3.7) * 0.15) * (horizonY * 0.65);
+                    const mw = W * 0.22;
+                    ctx.lineTo(mx - mw * 0.5, horizonY);
+                    ctx.quadraticCurveTo(mx - mw * 0.15, horizonY - mh * 0.7, mx, horizonY - mh);
+                    ctx.quadraticCurveTo(mx + mw * 0.15, horizonY - mh * 0.7, mx + mw * 0.5, horizonY);
+                }
+                ctx.lineTo(W, horizonY);
+                ctx.lineTo(W, H);
+                ctx.lineTo(0, H);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#8fa0b3';
+                ctx.beginPath();
+                ctx.moveTo(0, horizonY);
+                for (let i = -1; i <= mtnCount; i++) {
+                    const baseX = ((i / mtnCount) * W * 1.3 + mtnOffset * 1.15) % (W * 1.35);
+                    const mx = baseX;
+                    const mh = (0.22 + Math.sin(i * 3.4) * 0.18 + Math.cos(i * 5.1) * 0.1) * (horizonY * 0.45);
+                    const mw = W * 0.18;
+                    ctx.lineTo(mx - mw * 0.5, horizonY);
+                    ctx.quadraticCurveTo(mx, horizonY - mh * 1.1, mx + mw * 0.5, horizonY);
+                }
+                ctx.lineTo(W, horizonY);
+                ctx.lineTo(W, H);
+                ctx.lineTo(0, H);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            function drawHills() {
+                const hillOffset = scrollOffset * 0.2;
+                ctx.fillStyle = '#5d8a4a';
+                ctx.beginPath();
+                ctx.moveTo(0, horizonY + 15);
+                const hillCount = 10;
+                for (let i = -1; i <= hillCount; i++) {
+                    const baseX = ((i / hillCount) * W * 1.4 + hillOffset) % (W * 1.45);
+                    const hx = baseX;
+                    const hh = (0.25 + Math.sin(i * 1.8) * 0.2) * (H - horizonY) * 0.3;
+                    const hw = W * 0.16;
+                    ctx.lineTo(hx - hw * 0.5, horizonY + 15);
+                    ctx.quadraticCurveTo(hx, horizonY + 15 - hh, hx + hw * 0.5, horizonY + 15);
+                }
+                ctx.lineTo(W, horizonY + 15);
+                ctx.lineTo(W, H);
+                ctx.lineTo(0, H);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#6b9e55';
+                const hillOffset2 = scrollOffset * 0.25;
+                ctx.beginPath();
+                ctx.moveTo(0, horizonY + 10);
+                for (let i = -1; i <= hillCount + 2; i++) {
+                    const baseX = ((i / (hillCount + 2)) * W * 1.4 + hillOffset2) % (W * 1.45);
+                    const hx = baseX;
+                    const hh = (0.15 + Math.cos(i * 2.3) * 0.15) * (H - horizonY) * 0.2;
+                    const hw = W * 0.12;
+                    ctx.lineTo(hx - hw * 0.5, horizonY + 10);
+                    ctx.quadraticCurveTo(hx, horizonY + 10 - hh, hx + hw * 0.5, horizonY + 10);
+                }
+                ctx.lineTo(W, horizonY + 10);
+                ctx.lineTo(W, H);
+                ctx.lineTo(0, H);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            function drawTrees() {
+                const treeOffset = scrollOffset * 0.4;
+                const treeSpacing = W * 0.13;
+                const treeCount = Math.ceil(W / treeSpacing) + 3;
+                const treeY = groundY - (groundY - horizonY) * 0.25;
+
+                for (let i = -1; i < treeCount; i++) {
+                    const tx = ((i * treeSpacing + treeOffset) % (W + treeSpacing * 3)) - treeSpacing;
+                    const variation = Math.sin(i * 4.7) * 15;
+                    const ty = treeY + variation;
+                    const th = (0.35 + Math.cos(i * 3.1) * 0.1) * (groundY - horizonY) * 0.55;
+                    const tw = th * 0.45;
+
+                    ctx.fillStyle = '#4a3028';
+                    ctx.fillRect(tx - tw * 0.08, ty - th * 0.3, tw * 0.16, th * 0.35);
+
+                    ctx.fillStyle = '#3d7035';
+                    ctx.beginPath();
+                    ctx.moveTo(tx, ty - th);
+                    ctx.lineTo(tx + tw * 0.65, ty - th * 0.35);
+                    ctx.lineTo(tx + tw * 0.35, ty - th * 0.2);
+                    ctx.lineTo(tx + tw * 0.7, ty + th * 0.05);
+                    ctx.lineTo(tx + tw * 0.25, ty + th * 0.05);
+                    ctx.lineTo(tx + tw * 0.55, ty + th * 0.25);
+                    ctx.lineTo(tx - tw * 0.1, ty + th * 0.08);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.fillStyle = '#4a8a3f';
+                    ctx.beginPath();
+                    ctx.moveTo(tx, ty - th * 0.85);
+                    ctx.lineTo(tx + tw * 0.5, ty - th * 0.3);
+                    ctx.lineTo(tx + tw * 0.2, ty - th * 0.15);
+                    ctx.lineTo(tx + tw * 0.55, ty + th * 0.02);
+                    ctx.lineTo(tx + tw * 0.15, ty + th * 0.06);
+                    ctx.lineTo(tx + tw * 0.4, ty + th * 0.2);
+                    ctx.lineTo(tx - tw * 0.2, ty + th * 0.04);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+
+            function drawRoad() {
+                const roadTop = groundY - (groundY - horizonY) * 0.08;
+                const roadGrad = ctx.createLinearGradient(0, roadTop, 0, H);
+                roadGrad.addColorStop(0, '#5c5c5c');
+                roadGrad.addColorStop(0.03, '#4a4a4a');
+                roadGrad.addColorStop(0.5, '#3e3e3e');
+                roadGrad.addColorStop(1, '#333');
+                ctx.fillStyle = roadGrad;
+                ctx.fillRect(0, roadTop, W, H - roadTop);
+
+                ctx.fillStyle = '#525252';
+                ctx.fillRect(0, roadTop, W, 3);
+
+                const dashOffset = scrollOffset;
+                const dashLength = W * 0.06;
+                const dashGap = W * 0.09;
+                const dashY = groundY + (H - groundY) * 0.25;
+                const totalDash = dashLength + dashGap;
+                const dashCount = Math.ceil(W / totalDash) + 3;
+
+                ctx.fillStyle = '#e8e8e8';
+                for (let i = -1; i < dashCount; i++) {
+                    const dx = ((i * totalDash + dashOffset) % (W + totalDash * 2)) - totalDash;
+                    ctx.fillRect(dx, dashY, dashLength, Math.max(2, H * 0.008));
+                }
+
+                const dashY2 = groundY + (H - groundY) * 0.55;
+                ctx.fillStyle = '#e8e8e8';
+                for (let i = -1; i < dashCount; i++) {
+                    const dx = ((i * totalDash + dashOffset + totalDash * 0.5) % (W + totalDash * 2)) - totalDash;
+                    ctx.fillRect(dx, dashY2, dashLength * 1.1, Math.max(2, H * 0.008));
+                }
+
+                const edgeY = roadTop;
+                ctx.fillStyle = '#7a8a6a';
+                ctx.fillRect(0, edgeY - 2, W, 5);
+                ctx.fillStyle = '#8a9a78';
+                ctx.fillRect(0, edgeY - 1, W, 2);
+            }
+
+            function drawGrassVerge() {
+                const vergeTop = groundY - (groundY - horizonY) * 0.1;
+                const vergeGrad = ctx.createLinearGradient(0, vergeTop, 0, groundY);
+                vergeGrad.addColorStop(0, '#7a9a5a');
+                vergeGrad.addColorStop(1, '#5d7a3d');
+                ctx.fillStyle = vergeGrad;
+                ctx.fillRect(0, vergeTop, W, groundY - vergeTop);
+
+                const grassOffset = scrollOffset * 0.55;
+                ctx.strokeStyle = '#8ab868';
+                ctx.lineWidth = 1;
+                const bladeSpacing = 8;
+                const bladeCount = Math.ceil(W / bladeSpacing) + 2;
+                for (let i = -1; i < bladeCount; i++) {
+                    const gx = ((i * bladeSpacing + grassOffset * 1.3) % (W + bladeSpacing * 3)) - bladeSpacing;
+                    const gh = 6 + Math.sin(i * 7.3) * 4;
+                    ctx.beginPath();
+                    ctx.moveTo(gx, vergeTop + 2);
+                    ctx.quadraticCurveTo(gx + 2, vergeTop - gh, gx + 3 + Math.sin(i * 3.1) * 2, vergeTop - gh - 3);
+                    ctx.stroke();
+                }
+            }
+
+            function drawPersonShadow(persX, persGroundY) {
+                const shadowY = persGroundY + 2;
+                const shadowW = bodyScale * 22;
+                const shadowH = bodyScale * 6;
+                ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                ctx.beginPath();
+                ctx.ellipse(persX, shadowY, shadowW, shadowH, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            function drawDogShadow(dogX, dogGroundY) {
+                const shadowY = dogGroundY + 2;
+                const shadowW = bodyScale * 28;
+                const shadowH = bodyScale * 5;
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.beginPath();
+                ctx.ellipse(dogX, shadowY, shadowW, shadowH, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            function drawPerson(persX, persGroundY, phase, scale) {
+                const bobY = Math.abs(Math.sin(phase)) * scale * 8;
+                const torsoLean = Math.sin(phase) * 0.08;
+                const hipY = persGroundY - scale * 82 - bobY;
+                const shoulderY = hipY - scale * 55;
+                const headCY = shoulderY - scale * 38;
+                const headCX = persX + Math.sin(torsoLean) * scale * 15;
+                const headR = scale * 16;
+
+                const farLegPhase = phase + Math.PI;
+                drawLeg(persX, hipY, persGroundY, farLegPhase, scale, true);
+
+                const farArmPhase = phase + Math.PI;
+                drawArm(persX, shoulderY, farArmPhase, scale, true, false);
+
+                ctx.fillStyle = '#c75b4a';
+                ctx.save();
+                ctx.translate(persX, shoulderY + scale * 27);
+                ctx.rotate(-torsoLean);
+                const tw = scale * 22;
+                const th = scale * 55;
+                ctx.beginPath();
+                ctx.roundRect(-tw * 0.5, -th * 0.5, tw, th, scale * 6);
+                ctx.fill();
+                ctx.fillStyle = '#b84a3a';
+                ctx.beginPath();
+                ctx.roundRect(-tw * 0.5, -th * 0.5, tw, th * 0.35, scale * 6);
+                ctx.fill();
+                ctx.restore();
+
+                drawLeg(persX, hipY, persGroundY, phase, scale, false);
+                drawArm(persX, shoulderY, phase, scale, false, true);
+
+                ctx.fillStyle = '#e8c39e';
+                ctx.beginPath();
+                ctx.arc(headCX, headCY, headR, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#d4a87a';
+                ctx.beginPath();
+                ctx.arc(headCX, headCY, headR, -0.2, Math.PI + 0.2);
+                ctx.fill();
+
+                ctx.fillStyle = '#4a3528';
+                ctx.beginPath();
+                ctx.arc(headCX - headR * 0.25, headCY - headR * 1.05, headR * 1.1, Math.PI * 0.85, Math.PI * 1.95);
+                ctx.quadraticCurveTo(headCX + headR * 0.6, headCY - headR * 1.5, headCX + headR * 0.35, headCY - headR * 0.3);
+                ctx.quadraticCurveTo(headCX + headR * 0.2, headCY - headR * 1.3, headCX - headR * 0.4, headCY - headR * 1.2);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#3a2518';
+                ctx.beginPath();
+                ctx.arc(headCX - headR * 0.35, headCY - headR * 1.1, headR * 0.85, Math.PI * 0.9, Math.PI * 1.8);
+                ctx.quadraticCurveTo(headCX + headR * 0.4, headCY - headR * 1.35, headCX + headR * 0.2, headCY - headR * 0.35);
+                ctx.quadraticCurveTo(headCX, headCY - headR * 1.2, headCX - headR * 0.5, headCY - headR * 1.15);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#2a1a0a';
+                ctx.beginPath();
+                ctx.arc(headCX - headR * 0.7, headCY - headR * 0.05, headR * 0.28, 0, Math.PI * 2);
+                ctx.fill();
+
+                const neckY = shoulderY + scale * 6;
+                ctx.fillStyle = '#d4a87a';
+                ctx.fillRect(persX - scale * 4, neckY - scale * 5, scale * 8, scale * 12);
+            }
+
+            function drawLeg(hipX, hipY, groundY, phase, scale, isFar) {
+                const strideLen = scale * 28;
+                const footX = hipX + Math.sin(phase) * strideLen;
+                const liftAmount = Math.max(0, -Math.sin(phase)) * scale * 22;
+                const footY = groundY - liftAmount;
+
+                const dx = footX - hipX;
+                const dy = footY - hipY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const kneeRatio = 0.42;
+                const bendAmount = Math.abs(Math.cos(phase)) * scale * 16;
+                const bendDir = (footX > hipX) ? -1 : 1;
+                const mx = hipX + dx * kneeRatio;
+                const my = hipY + dy * kneeRatio;
+                const nx = -dy / dist;
+                const ny = dx / dist;
+                const kneeX = mx + nx * bendAmount * bendDir;
+                const kneeY = my + ny * bendAmount * bendDir;
+
+                const legColor = isFar ? '#3a4a5c' : '#4a5a6e';
+                const legWidth = scale * (isFar ? 7 : 8);
+
+                ctx.fillStyle = legColor;
+                ctx.strokeStyle = legColor;
+                ctx.lineWidth = legWidth;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(hipX, hipY);
+                ctx.lineTo(kneeX, kneeY);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(kneeX, kneeY);
+                ctx.lineTo(footX, footY);
+                ctx.stroke();
+
+                const shoeColor = isFar ? '#2a2218' : '#3a3028';
+                ctx.fillStyle = shoeColor;
+                ctx.save();
+                ctx.translate(footX, footY);
+                const shoeAngle = Math.atan2(footY - kneeY, footX - kneeX);
+                ctx.rotate(shoeAngle);
+                ctx.beginPath();
+                ctx.roundRect(-scale * 5, -scale * 3, scale * 16, scale * 7, scale * 3);
+                ctx.fill();
+                ctx.fillStyle = '#1a1008';
+                ctx.beginPath();
+                ctx.roundRect(-scale * 3, -scale * 2, scale * 8, scale * 4, scale * 2);
+                ctx.fill();
+                ctx.restore();
+
+                if (!isFar) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                    ctx.beginPath();
+                    ctx.arc(footX, groundY + 1, scale * 5, 0, Math.PI);
+                    ctx.fill();
+                }
+            }
+
+            function drawArm(shoulderX, shoulderY, phase, scale, isFar, isLeashArm) {
+                const swingAmp = isLeashArm ? scale * 8 : scale * 22;
+                const elbowX = shoulderX + Math.sin(phase) * swingAmp;
+                const elbowY = shoulderY + scale * 20 + Math.abs(Math.cos(phase)) * scale * 10;
+                const forearmLen = scale * 28;
+                const elbowToHandAngle = isLeashArm ? -0.6 + Math.sin(phase) * 0.2 : Math.sin(phase + 0.5) * 0.7;
+                const handX = elbowX + Math.cos(elbowToHandAngle - 0.5) * forearmLen;
+                const handY = elbowY + Math.sin(elbowToHandAngle - 0.5) * forearmLen;
+
+                const armColor = isFar ? '#c75b4a' : '#d46b5a';
+                const armWidth = scale * (isFar ? 5 : 6);
+
+                ctx.fillStyle = armColor;
+                ctx.strokeStyle = armColor;
+                ctx.lineWidth = armWidth;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(shoulderX, shoulderY);
+                ctx.lineTo(elbowX, elbowY);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(elbowX, elbowY);
+                ctx.lineTo(handX, handY);
+                ctx.stroke();
+
+                ctx.fillStyle = '#e8c39e';
+                ctx.beginPath();
+                ctx.arc(handX, handY, scale * 5, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (isLeashArm && !isFar) {
+                    return { handX, handY };
+                }
+                return null;
+            }
+
+            function drawDog(dogX, dogGroundY, phase, scale) {
+                const bobY = Math.abs(Math.sin(phase * 1.3)) * scale * 6;
+                const bodyCX = dogX + scale * 5;
+                const bodyCY = dogGroundY - scale * 38 - bobY;
+                const bodyW = scale * 50;
+                const bodyH = scale * 22;
+
+                const nearRearPhase = phase;
+                const nearFrontPhase = phase + Math.PI;
+                const farRearPhase = phase + Math.PI;
+                const farFrontPhase = phase;
+
+                drawDogLeg(dogX - bodyW * 0.25, bodyCY + bodyH * 0.3, dogGroundY, farRearPhase, scale, true);
+                drawDogLeg(dogX + bodyW * 0.3, bodyCY + bodyH * 0.25, dogGroundY, farFrontPhase, scale, true);
+
+                const bodyGrad = ctx.createLinearGradient(0, bodyCY - bodyH, 0, bodyCY + bodyH);
+                bodyGrad.addColorStop(0, '#d4a060');
+                bodyGrad.addColorStop(0.4, '#c49450');
+                bodyGrad.addColorStop(0.7, '#b88440');
+                bodyGrad.addColorStop(1, '#e8d5b0');
+                ctx.fillStyle = bodyGrad;
+                ctx.beginPath();
+                ctx.ellipse(bodyCX, bodyCY, bodyW, bodyH, -0.03, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#e8d5b0';
+                ctx.beginPath();
+                ctx.ellipse(bodyCX, bodyCY + bodyH * 0.25, bodyW * 0.7, bodyH * 0.55, -0.03, 0, Math.PI);
+                ctx.fill();
+
+                drawDogLeg(dogX - bodyW * 0.25, bodyCY + bodyH * 0.3, dogGroundY, nearRearPhase, scale, false);
+                drawDogLeg(dogX + bodyW * 0.3, bodyCY + bodyH * 0.25, dogGroundY, nearFrontPhase, scale, false);
+
+                const headCX = dogX + bodyW * 0.75;
+                const headCY = bodyCY - bodyH * 0.35;
+                const headR = scale * 14;
+                const neckW = scale * 10;
+
+                ctx.fillStyle = '#c49450';
+                ctx.beginPath();
+                ctx.moveTo(bodyCX + bodyW * 0.55, bodyCY - bodyH * 0.2);
+                ctx.quadraticCurveTo(bodyCX + bodyW * 0.7, bodyCY - bodyH * 0.5, headCX - headR * 0.5, headCY);
+                ctx.quadraticCurveTo(bodyCX + bodyW * 0.7, bodyCY + bodyH * 0.1, bodyCX + bodyW * 0.55, bodyCY + bodyH * 0.15);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#c49450';
+                ctx.beginPath();
+                ctx.arc(headCX, headCY, headR, 0, Math.PI * 2);
+                ctx.fill();
+
+                const snoutLen = scale * 16;
+                const snoutH = scale * 9;
+                ctx.fillStyle = '#d4a868';
+                ctx.beginPath();
+                ctx.ellipse(headCX + headR * 0.5 + snoutLen * 0.4, headCY + headR * 0.1, snoutLen, snoutH, -0.1, 0, Math.PI *
+                    2);
+                ctx.fill();
+
+                ctx.fillStyle = '#2a1a0a';
+                ctx.beginPath();
+                ctx.arc(headCX + headR * 0.5 + snoutLen * 0.85, headCY - snoutH * 0.15, scale * 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#2a1a0a';
+                ctx.beginPath();
+                ctx.arc(headCX - headR * 0.35, headCY - headR * 0.4, scale * 3.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1a0a00';
+                ctx.beginPath();
+                ctx.arc(headCX - headR * 0.35, headCY - headR * 0.4, scale * 1.8, 0, Math.PI * 2);
+                ctx.fill();
+
+                const earCX = headCX - headR * 0.2;
+                const earCY = headCY - headR * 0.75;
+                const earFlop = Math.sin(phase * 1.3 + time * 0.5) * 0.15;
+                ctx.fillStyle = '#6b3a1f';
+                ctx.beginPath();
+                ctx.ellipse(earCX, earCY, scale * 7, scale * 13, 0.2 + earFlop, Math.PI * 0.7, Math.PI * 1.6);
+                ctx.quadraticCurveTo(earCX - scale * 4, earCY + scale * 10, earCX + scale * 2, earCY + scale * 6);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#d43030';
+                ctx.lineWidth = scale * 2.5;
+                ctx.strokeStyle = '#d43030';
+                ctx.beginPath();
+                const collarX = headCX - headR * 0.5;
+                const collarY = headCY + headR * 0.15;
+                ctx.arc(collarX, collarY, headR * 0.75, Math.PI * 0.55, Math.PI * 1.45);
+                ctx.stroke();
+
+                const collarRingX = collarX + Math.cos(Math.PI * 0.55) * headR * 0.75;
+                const collarRingY = collarY + Math.sin(Math.PI * 0.55) * headR * 0.75;
+                ctx.fillStyle = '#f0c040';
+                ctx.beginPath();
+                ctx.arc(collarRingX, collarRingY, scale * 2.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                const tailBaseX = dogX - bodyW * 0.7;
+                const tailBaseY = bodyCY - bodyH * 0.4;
+                const tailWag = Math.sin(phase * 1.8 + time * 0.7) * 0.6;
+                const tailLen = scale * 28;
+                ctx.strokeStyle = '#b88440';
+                ctx.lineWidth = scale * 4;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(tailBaseX, tailBaseY);
+                const tailCP1X = tailBaseX - tailLen * 0.3;
+                const tailCP1Y = tailBaseY - tailLen * 0.5;
+                const tailCP2X = tailBaseX - tailLen * 0.6 + tailWag * scale * 10;
+                const tailCP2Y = tailBaseY - tailLen * 0.3;
+                const tailEndX = tailBaseX - tailLen * 0.7 + tailWag * scale * 14;
+                const tailEndY = tailBaseY + tailLen * 0.1;
+                ctx.bezierCurveTo(tailCP1X, tailCP1Y, tailCP2X, tailCP2Y, tailEndX, tailEndY);
+                ctx.stroke();
+
+                ctx.fillStyle = '#e8d5b0';
+                ctx.beginPath();
+                ctx.arc(tailEndX, tailEndY, scale * 3.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                return { collarX: collarRingX, collarY: collarRingY };
+            }
+
+            function drawDogLeg(legX, legY, groundY, phase, scale, isFar) {
+                const strideLen = scale * 16;
+                const footX = legX + Math.sin(phase) * strideLen;
+                const liftAmount = Math.max(0, -Math.sin(phase)) * scale * 14;
+                const footY = groundY - liftAmount;
+
+                const dx = footX - legX;
+                const dy = footY - legY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const kneeRatio = 0.45;
+                const bendAmount = Math.abs(Math.cos(phase)) * scale * 8;
+                const bendDir = (footX > legX) ? -1 : 1;
+                const mx = legX + dx * kneeRatio;
+                const my = legY + dy * kneeRatio;
+                const nx = -dy / (dist || 1);
+                const ny = dx / (dist || 1);
+                const kneeX = mx + nx * bendAmount * bendDir;
+                const kneeY = my + ny * bendAmount * bendDir;
+
+                const legColor = isFar ? '#9a7030' : '#b88440';
+                const legWidth = scale * (isFar ? 4.5 : 5.5);
+
+                ctx.fillStyle = legColor;
+                ctx.strokeStyle = legColor;
+                ctx.lineWidth = legWidth;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(legX, legY);
+                ctx.lineTo(kneeX, kneeY);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(kneeX, kneeY);
+                ctx.lineTo(footX, footY);
+                ctx.stroke();
+
+                ctx.fillStyle = '#c49450';
+                ctx.beginPath();
+                ctx.arc(footX, footY, scale * 3.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            function drawLeash(handX, handY, collarX, collarY, time) {
+                const midX = (handX + collarX) / 2;
+                const midY = (handY + collarY) / 2;
+                const dist = Math.sqrt((collarX - handX) ** 2 + (collarY - handY) ** 2);
+                const droop = dist * 0.2 + Math.sin(time * 3.5) * dist * 0.03;
+                const cpX = midX;
+                const cpY = midY + droop;
+
+                const leashGrad = ctx.createLinearGradient(handX, handY, collarX, collarY);
+                leashGrad.addColorStop(0, '#5a3a2a');
+                leashGrad.addColorStop(0.5, '#6b4a35');
+                leashGrad.addColorStop(1, '#4a2a1a');
+
+                ctx.strokeStyle = leashGrad;
+                ctx.lineWidth = bodyScale * 2.8;
+                ctx.lineCap = 'round';
+                ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                ctx.shadowBlur = bodyScale * 3;
+                ctx.beginPath();
+                ctx.moveTo(handX, handY);
+                ctx.quadraticCurveTo(cpX, cpY, collarX, collarY);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                ctx.lineWidth = bodyScale * 0.8;
+                ctx.beginPath();
+                ctx.moveTo(handX, handY);
+                ctx.quadraticCurveTo(cpX - bodyScale * 2, cpY - bodyScale * 2, collarX, collarY);
+                ctx.stroke();
+            }
+
+            function drawScene(timestamp) {
+                if (!time) time = timestamp;
+                const dt = Math.min((timestamp - time) / 1000, 0.1);
+                time = timestamp;
+                scrollOffset += SCROLL_SPEED * dt;
+                if (scrollOffset > W * 5) scrollOffset -= W * 5;
+
+                ctx.clearRect(0, 0, W, H);
+
+                drawSky();
+                drawClouds();
+                drawMountains();
+                drawHills();
+                drawTrees();
+                drawRoad();
+                drawGrassVerge();
+
+                const walkFreq = 6.8;
+                const personPhase = time * walkFreq;
+                const dogPhase = time * 9.5;
+
+                const persX = W * 0.58;
+                const persGroundY = groundY;
+                const dogX = W * 0.22;
+                const dogGroundY = groundY;
+
+                drawDogShadow(dogX, dogGroundY);
+                drawPersonShadow(persX, persGroundY);
+
+                const collarPos = drawDog(dogX, dogGroundY, dogPhase, bodyScale);
+                const leashInfo = drawPersonWithLeash(persX, persGroundY, personPhase, bodyScale);
+
+                if (leashInfo && collarPos) {
+                    drawLeash(leashInfo.handX, leashInfo.handY, collarPos.collarX, collarPos.collarY, time);
+                }
+            }
+
+            function drawPersonWithLeash(persX, persGroundY, phase, scale) {
+                const bobY = Math.abs(Math.sin(phase)) * scale * 8;
+                const torsoLean = Math.sin(phase) * 0.08;
+                const hipY = persGroundY - scale * 82 - bobY;
+                const shoulderY = hipY - scale * 55;
+                const headCY = shoulderY - scale * 38;
+                const headCX = persX + Math.sin(torsoLean) * scale * 15;
+                const headR = scale * 16;
+
+                const farLegPhase = phase + Math.PI;
+                drawLeg(persX, hipY, persGroundY, farLegPhase, scale, true);
+
+                const farArmPhase = phase + Math.PI;
+                drawArm(persX, shoulderY, farArmPhase, scale, true, false);
+
+                ctx.fillStyle = '#c75b4a';
+                ctx.save();
+                ctx.translate(persX, shoulderY + scale * 27);
+                ctx.rotate(-torsoLean);
+                const tw = scale * 22;
+                const th = scale * 55;
+                ctx.beginPath();
+                ctx.roundRect(-tw * 0.5, -th * 0.5, tw, th, scale * 6);
+                ctx.fill();
+                ctx.fillStyle = '#b84a3a';
+                ctx.beginPath();
+                ctx.roundRect(-tw * 0.5, -th * 0.5, tw, th * 0.35, scale * 6);
+                ctx.fill();
+                ctx.restore();
+
+                drawLeg(persX, hipY, persGroundY, phase, scale, false);
+
+                const leashArmPhase = phase + 0.35;
+                const leashInfo = drawArmLeash(persX, shoulderY, leashArmPhase, scale);
+
+                ctx.fillStyle = '#e8c39e';
+                ctx.beginPath();
+                ctx.arc(headCX, headCY, headR, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#d4a87a';
+                ctx.beginPath();
+                ctx.arc(headCX, headCY, headR, -0.2, Math.PI + 0.2);
+                ctx.fill();
+
+                ctx.fillStyle = '#4a3528';
+                ctx.beginPath();
+                ctx.arc(headCX - headR * 0.25, headCY - headR * 1.05, headR * 1.1, Math.PI * 0.85, Math.PI * 1.95);
+                ctx.quadraticCurveTo(headCX + headR * 0.6, headCY - headR * 1.5, headCX + headR * 0.35, headCY - headR * 0.3);
+                ctx.quadraticCurveTo(headCX + headR * 0.2, headCY - headR * 1.3, headCX - headR * 0.4, headCY - headR * 1.2);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#3a2518';
+                ctx.beginPath();
+                ctx.arc(headCX - headR * 0.35, headCY - headR * 1.1, headR * 0.85, Math.PI * 0.9, Math.PI * 1.8);
+                ctx.quadraticCurveTo(headCX + headR * 0.4, headCY - headR * 1.35, headCX + headR * 0.2, headCY - headR * 0.35);
+                ctx.quadraticCurveTo(headCX, headCY - headR * 1.2, headCX - headR * 0.5, headCY - headR * 1.15);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#2a1a0a';
+                ctx.beginPath();
+                ctx.arc(headCX - headR * 0.7, headCY - headR * 0.05, headR * 0.28, 0, Math.PI * 2);
+                ctx.fill();
+
+                const neckY = shoulderY + scale * 6;
+                ctx.fillStyle = '#d4a87a';
+                ctx.fillRect(persX - scale * 4, neckY - scale * 5, scale * 8, scale * 12);
+
+                return leashInfo;
+            }
+
+            function drawArmLeash(shoulderX, shoulderY, phase, scale) {
+                const swingAmp = scale * 8;
+                const elbowX = shoulderX + Math.sin(phase) * swingAmp - scale * 10;
+                const elbowY = shoulderY + scale * 18 + Math.abs(Math.cos(phase)) * scale * 6;
+                const forearmLen = scale * 30;
+                const elbowToHandAngle = -0.55 + Math.sin(phase) * 0.18;
+                const handX = elbowX + Math.cos(elbowToHandAngle - 0.45) * forearmLen;
+                const handY = elbowY + Math.sin(elbowToHandAngle - 0.45) * forearmLen;
+
+                ctx.fillStyle = '#d46b5a';
+                ctx.strokeStyle = '#d46b5a';
+                ctx.lineWidth = scale * 6;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(shoulderX, shoulderY);
+                ctx.lineTo(elbowX, elbowY);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(elbowX, elbowY);
+                ctx.lineTo(handX, handY);
+                ctx.stroke();
+
+                ctx.fillStyle = '#e8c39e';
+                ctx.beginPath();
+                ctx.arc(handX, handY, scale * 5, 0, Math.PI * 2);
+                ctx.fill();
+
+                return { handX, handY };
+            }
+
+            function animate(timestamp) {
+                drawScene(timestamp);
+                requestAnimationFrame(animate);
+            }
+
+            if (!ctx.roundRect) {
+                ctx.roundRect = function(x, y, w, h, r) {
+                    if (typeof r === 'number') r = { tl: r, tr: r, br: r, bl: r };
+                    ctx.beginPath();
+                    ctx.moveTo(x + r.tl, y);
+                    ctx.lineTo(x + w - r.tr, y);
+                    ctx.quadraticCurveTo(x + w, y, x + w, y + r.tr);
+                    ctx.lineTo(x + w, y + h - r.br);
+                    ctx.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
+                    ctx.lineTo(x + r.bl, y + h);
+                    ctx.quadraticCurveTo(x, y + h, x, y + h - r.bl);
+                    ctx.lineTo(x, y + r.tl);
+                    ctx.quadraticCurveTo(x, y, x + r.tl, y);
+                    ctx.closePath();
+                };
+            }
+
+            requestAnimationFrame(animate);
+        })();
+    </script>
+</body>
+</html>
