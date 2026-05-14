@@ -860,6 +860,18 @@ function buildCalibrateCmd(model) {
 }
 
 
+function renderCommandText(blockId, text) {
+  const block = document.getElementById(blockId);
+  if (!block) return;
+  // Wrap each space-separated token in a no-break span
+  // so lines only break at spaces, never mid-token at hyphens
+  var html = text.split(' ').map(function(t) {
+    return '<span class="tok">' + t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span>';
+  }).join(' ');
+  block.innerHTML = html;
+  addCopyButton(blockId, text);
+}
+
 function addCopyButton(blockId, text) {
   const block = document.getElementById(blockId);
   if (!block) return;
@@ -892,8 +904,7 @@ function updateCommand() {
   const ctx = getContextForModel(model, vramMib);
 
   const cmdText = buildCmd(model, ctx, vision);
-  document.getElementById('command').textContent = cmdText;
-  addCopyButton('command', cmdText);
+  renderCommandText('command', cmdText);
 
   // Update model path note for current OS
   const osKey = document.getElementById('os').value;
@@ -906,8 +917,7 @@ function updateCommand() {
     document.getElementById('entropy-note').innerHTML =
       `One-time calibration for <code>${model.entropy_profile}</code>. Already committed in our fork.`;
     const calText = buildCalibrateCmd(model);
-    document.getElementById('entropy-command').textContent = calText;
-    addCopyButton('entropy-command', calText);
+    renderCommandText('entropy-command', calText);
   } else {
     document.getElementById('entropy-card').classList.add('hidden');
   }
