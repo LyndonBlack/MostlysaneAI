@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Newton's Cradle</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 50% 30%, #f4f6fa 0%, #dde2eb 55%, #c4cad6 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+</style>
+</head>
+<body>
+<canvas id="cradle"></canvas>
+<script>
+(() => {
+  'use strict';
+
+  const canvas = document.getElementById('cradle');
+  const ctx = canvas.getContext('2d');
+
+  /* ============================================================
+   *  CONFIGURATION CONSTANTS
+   * ============================================================ */
+  const BALL_COUNT       = 5;            // number of suspended balls
+  const BASE_BALL_RADIUS = 34;           // ball radius at default scale (px)
+  const BASE_STRING_LEN  = 250;          // suspension string length (px)
+  const MAX_ANGLE        = Math.PI / 5;  // ~36° max swing amplitude
+  const PERIOD           = 1.55;         // seconds for one complete left↔right cycle
+  const PHASE_TIME       = PERIOD / 4;   // each of the 4 motion phases takes this long
+  const STRING_COLOR     = 'rgba(35, 40, 50, 0.85)';
+
+  /* ============================================================
+   *  CANVAS / DPI HANDLING
+   * ============================================================ */
+  let W = 0, H = 0, dpr = 1;
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width  = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  /* ============================================================
+   *  MOTION MODEL
+   *
+   *  The cycle is split into 4 equal phases (T/4 each):
+   *    Phase A: Left ball swings down from -MAX to 0  (gains velocity)
+   *             -> impact at boundary, momentum transfers across the row.
+   *    Phase B: Right ball swings up from 0 to +MAX  (loses velocity)
+   *    Phase C: Right ball swings down from +MAX to 0 (gains velocity)
+   *             -> impact, momentum transfers back across.
+   *    Phase D: Left ball swings up from 0 to -MAX   (loses velocity)
+   *  Position and velocity are continuous across all boundaries,
+   *  so the loop is seamless.
+   * ============================================================ */
+  function computeAngles(phase) {
+    let leftA = 0, rightA = 0;
+    let impactPulse = 0;                // peaks briefly at the two impact moments
+
+    if (phase < 1) {
+      // Phase A — left swings inward (cosine: starts at -MAX, ends at 0)
+      leftA = -MAX_ANGLE * Math.cos(phase * Math.PI / 2);
+      impactPulse = Math.max(0, 1 - (1 - phase) * 10);          // rising toward impact
+    } else if (phase < 2) {
+      // Phase B — right swings outward (sine: 0 -> +MAX)
+      const t = phase - 1;
+      rightA = MAX_ANGLE * Math.sin(t * Math.PI / 2);
+      impactPulse = Math.max(0, 1 - t * 10);                    // decaying after impact
+    } else if (phase < 3) {
+      // Phase C — right swings back inward (cosine: +MAX -> 0)
+      const t = phase - 2;
+      rightA = MAX_ANGLE * Math.cos(t * Math.PI / 2);
+      impactPulse = Math.max(0, 1 - (1 - t) * 10);              // rising toward impact
+    } else {
+      // Phase D — left swings outward (sine: 0 -> -MAX)
+      const t = phase - 3;
+      leftA = -MAX_ANGLE * Math.sin(t * Math.PI / 2);
+      impactPulse = Math.max(0, 1 - t * 10);                    // decaying after impact
+    }
+    return { leftA, rightA, impactPulse };
+  }
+
+  /* ============================================================
+   *  DRAWING PRIMITIVES
+   * ============================================================ */
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+
+  // Draws the support frame: base, two posts, and top beam
+  function drawFrame(cx, pivotY, halfBeam, baseY) {
+    const beamThick = 14;
+    const postWidth = 14;
+
+    // soft ground shadow under base
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.beginPath();
+    ctx.ellipse(cx, baseY + 22, halfBeam + 70, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // helper: vertical metallic gradient
+    function metalV(yTop, yBot) {
+      const g = ctx.createLinearGradient(0, yTop, 0, yBot);
+      g.addColorStop(0,    '#5a6478');
+      g.addColorStop(0.45, '#2d3340');
+      g.addColorStop(0.55, '#1f242f');
+      g.addColorStop(1,    '#3a4150');
+      return g;
+    }
+    // helper: horizontal metallic gradient (used on beam highlight)
+    function metalH(xLeft, xRight) {
+      const g = ctx.createLinearGradient(xLeft, 0, xRight, 0);
+      g.addColorStop(0,    '#2d3340');
+      g.addColorStop(0.5,  '#6a7484');
+      g.addColorStop(1,    '#2d3340');
+      return g;
+    }
+
+    // Base platform
+    const baseW = (halfBeam + 50) * 2;
+    ctx.fillStyle = metalV(baseY, baseY + 22);
+    roundRect(cx - baseW / 2, baseY, baseW, 20, 5);
+    ctx.fill();
+    // base top highlight
+    const baseHi = ctx.createLinearGradient(0, baseY, 0, baseY + 6);
+    baseHi.addColorStop(0, 'rgba(255,255,255,0.45)');
+    baseHi.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = baseHi;
+    roundRect(cx - baseW / 2 + 4, baseY + 1, baseW - 8, 6, 3);
+    ctx.fill();
+
+    // Left and right posts
+    const postH = baseY - pivotY;
+    [-halfBeam, halfBeam].forEach(off => {
+      ctx.fillStyle = metalV(pivotY, baseY);
+      roundRect(cx + off - postWidth / 2, pivotY, postWidth, postH, 3);
+      ctx.fill();
+      // post highlight strip on its left face
+      const pg = ctx.createLinearGradient(cx + off - postWidth / 2, 0,
+                                          cx + off + postWidth / 2, 0);
+      pg.addColorStop(0,   'rgba(255,255,255,0.35)');
+      pg.addColorStop(0.4, 'rgba(255,255,255,0.05)');
+      pg.addColorStop(1,   'rgba(0,0,0,0.25)');
+      ctx.fillStyle = pg;
+      roundRect(cx + off - postWidth / 2, pivotY, postWidth, postH, 3);
+      ctx.fill();
+    });
+
+    // Top beam (spans between posts with small overhang)
+    const beamX = cx - halfBeam - 20;
+    const beamW = (halfBeam + 20) * 2;
+    ctx.fillStyle = metalH(beamX, beamX + beamW);
+    roundRect(beamX, pivotY - beamThick / 2, beamW, beamThick, 5);
+    ctx.fill();
+    // beam top highlight
+    const beamHi = ctx.createLinearGradient(0, pivotY - beamThick / 2,
+                                            0, pivotY);
+    beamHi.addColorStop(0, 'rgba(255,255,255,0.55)');
+    beamHi.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = beamHi;
+    roundRect(beamX + 3, pivotY - beamThick / 2 + 1,
+              beamW - 6, beamThick / 2, 4);
+    ctx.fill();
+    // beam bottom shading
+    const beamLo = ctx.createLinearGradient(0, pivotY,
+                                            0, pivotY + beamThick / 2);
+    beamLo.addColorStop(0, 'rgba(0,0,0,0)');
+    beamLo.addColorStop(1, 'rgba(0,0,0,0.35)');
+    ctx.fillStyle = beamLo;
+    roundRect(beamX + 3, pivotY, beamW - 6, beamThick / 2 - 1, 4);
+    ctx.fill();
+  }
+
+  // Single thin suspension string
+  function drawString(px, py, bx, by) {
+    ctx.strokeStyle = STRING_COLOR;
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+  }
+
+  // Shiny chrome ball with multi-layered shading
+  function drawBall(x, y, r) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.clip();
+
+    // Layer 1 — vertical "sky/ground" reflection (chrome horizon)
+    const horizon = ctx.createLinearGradient(x, y - r, x, y + r);
+    horizon.addColorStop(0.00, '#f1f4f8');
+    horizon.addColorStop(0.40, '#a8aebb');
+    horizon.addColorStop(0.50, '#181c25');
+    horizon.addColorStop(0.55, '#22262f');
+    horizon.addColorStop(0.85, '#6a7180');
+    horizon.addColorStop(1.00, '#383e4a');
+    ctx.fillStyle = horizon;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+
+    // Layer 2 — spherical shading (lighter top-left, darker bottom-right)
+    const sphere = ctx.createRadialGradient(
+      x - r * 0.35, y - r * 0.45, r * 0.05,
+      x + r * 0.15, y + r * 0.15, r * 1.15
+    );
+    sphere.addColorStop(0,    'rgba(255,255,255,0.35)');
+    sphere.addColorStop(0.45, 'rgba(255,255,255,0.00)');
+    sphere.addColorStop(0.80, 'rgba(0,0,0,0.18)');
+    sphere.addColorStop(1.00, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = sphere;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+
+    // Layer 3 — bright bottom rim (light bouncing off the ground)
+    const rim = ctx.createRadialGradient(
+      x, y + r * 0.85, r * 0.02,
+      x, y + r * 0.85, r * 0.55
+    );
+    rim.addColorStop(0,    'rgba(220,228,240,0.85)');
+    rim.addColorStop(0.55, 'rgba(180,190,205,0.25)');
+    rim.addColorStop(1,    'rgba(180,190,205,0)');
+    ctx.fillStyle = rim;
+    ctx.fillRect(x - r, y, r * 2, r);
+
+    // Layer 4 — main specular highlight
+    const spec = ctx.createRadialGradient(
+      x - r * 0.38, y - r * 0.48, 0,
+      x - r * 0.38, y - r * 0.48, r * 0.45
+    );
+    spec.addColorStop(0,    'rgba(255,255,255,0.95)');
+    spec.addColorStop(0.35, 'rgba(255,255,255,0.35)');
+    spec.addColorStop(1,    'rgba(255,255,255,0)');
+    ctx.fillStyle = spec;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+
+    ctx.restore();
+
+    // Tiny pin-point highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.beginPath();
+    ctx.arc(x - r * 0.42, y - r * 0.55, r * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Edge darkening for definition
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(x, y, r - 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Cast shadow on the implicit floor below
+  function drawBallShadow(x, ballY, groundY, r) {
+    // Higher ball -> shadow is wider, softer, fainter
+    const drop = groundY - ballY;
+    const t = Math.max(0, Math.min(1, drop / (BASE_STRING_LEN * 1.2)));
+    const spread = 1 + t * 0.9;
+    const alpha = 0.30 * (1 - t * 0.75);
+    ctx.fillStyle = `rgba(15, 20, 30, ${alpha})`;
+    ctx.beginPath();
+    ctx.ellipse(x, groundY, r * 1.0 * spread, r * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /* ============================================================
+   *  MAIN RENDER LOOP
+   * ============================================================ */
+  const startTime = performance.now();
+
+  function render(now) {
+    const elapsed = (now - startTime) / 1000;
+    const phase = (elapsed / PHASE_TIME) % 4;          // 0..4 looping continuously
+    const { leftA, rightA, impactPulse } = computeAngles(phase);
+
+    // Responsive scale — keep cradle nicely sized on any viewport
+    const scale = Math.min(1, Math.min(W, H) / 720);
+    const R     = BASE_BALL_RADIUS * scale;
+    const L     = BASE_STRING_LEN  * scale;
+    const ballSpacing = R * 2;                          // balls touching
+    const halfBeam    = ((BALL_COUNT - 1) * ballSpacing) / 2 + R * 1.2;
+
+    // Vertical layout — frame slightly above center so swing has room
+    const cx       = W / 2;
+    const pivotY   = H * 0.22;
+    const groundY  = pivotY + L + R + 55 * scale;
+    const baseY    = groundY + 8 * scale;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Soft floor highlight
+    const floor = ctx.createRadialGradient(cx, groundY + 10, 30,
+                                           cx, groundY + 10, Math.max(W, H) * 0.7);
+    floor.addColorStop(0, 'rgba(200,210,225,0.45)');
+    floor.addColorStop(1, 'rgba(200,210,225,0)');
+    ctx.fillStyle = floor;
+    ctx.fillRect(0, 0, W, H);
+
+    // Compute each ball position
+    const balls = [];
+    for (let i = 0; i < BALL_COUNT; i++) {
+      const pivotX = cx - ((BALL_COUNT - 1) / 2) * ballSpacing + i * ballSpacing;
+
+      let angle = 0;
+      if (i === 0) {
+        angle = leftA;
+      } else if (i === BALL_COUNT - 1) {
+        angle = rightA;
+      } else {
+        // Middle balls — almost stationary, with a barely-visible compression
+        // wobble during impact moments (deterministic, not random)
+        angle = impactPulse * 0.0035 * Math.sin(i * 1.7 + elapsed * 55);
+      }
+
+      const bx = pivotX + Math.sin(angle) * L;
+      const by = pivotY + Math.cos(angle) * L;
+      balls.push({ pivotX, pivotY, bx, by, angle });
+    }
+
+    // 1) ground shadows (behind everything)
+    for (const b of balls) drawBallShadow(b.bx, b.by, groundY, R);
+
+    // 2) support frame
+    drawFrame(cx, pivotY, halfBeam, baseY);
+
+    // 3) suspension strings
+    for (const b of balls) drawString(b.pivotX, b.pivotY, b.bx, b.by);
+
+    // 4) balls themselves
+    for (const b of balls) drawBall(b.bx, b.by, R);
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>
