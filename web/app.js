@@ -373,8 +373,12 @@ function updateInstallGuide() {
   const os = OS_CONFIG[osKey];
   if (!os) return;
 
-  // Populate one-liner installer commands
-  var nixCmd = 'curl -sSL https://lyndonblack.github.io/MostlysaneAI/install/install.sh | bash';
+  // Populate one-liner installer commands (model-aware)
+  const activeModel = getActiveModel();
+  const variantFile = activeModel ? getVariantFile(activeModel) : '';
+  var nixCmd = variantFile
+    ? 'curl -sSL https://lyndonblack.github.io/MostlysaneAI/install/install.sh | bash -s -- --model ' + variantFile
+    : 'curl -sSL https://lyndonblack.github.io/MostlysaneAI/install/install.sh | bash';
   var winCmd = 'powershell -c "irm https://lyndonblack.github.io/MostlysaneAI/install/install.ps1 | iex"';
   var oneLinerNix = document.getElementById('one-liner-cmd');
   var oneLinerWin = document.getElementById('one-liner-win');
