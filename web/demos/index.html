@@ -35,6 +35,9 @@
     border: 1px solid var(--border);
     border-radius: 8px;
   }
+  .demo-frame.tall {
+    height: 640px;
+  }
 </style>
 </head>
 <body>
@@ -96,20 +99,20 @@
 
 
 <div class="demo-card">
-  <h2>Qwen3.6 35B A3B <span style="font-size:0.75rem;color:var(--red);font-weight:normal">(no reasoning, 1st pass)</span></h2>
+  <h2>Qwen3.6 35B A3B <span style="font-size:0.75rem;color:var(--red);font-weight:normal">(no reasoning)</span></h2>
   <div class="model-source">Local — Fail (D) — Balls not touching, no impact physics</div>
-  <iframe class="demo-frame" src="Newtons_cradle-Qwen3.6-no_reasoning-1st-pass.html" loading="lazy"></iframe>
+  <iframe class="demo-frame tall" src="Newtons_cradle-Qwen3.6-no_reasoning-1st-pass.html" loading="lazy"></iframe>
 </div>
 
 <div class="demo-card">
   <h2>Gemini Pro 3.1</h2>
   <div class="model-source">Cloud — Google — Pass (A-) — Best physics, shadows misplaced</div>
-  <iframe class="demo-frame" src="Newtons_cradle-Gemini-Pro-3_1.html" loading="lazy"></iframe>
+  <iframe class="demo-frame tall" src="Newtons_cradle-Gemini-Pro-3_1.html" loading="lazy"></iframe>
 </div>
 
 <div class="demo-card">
   <h2>ChatGPT 5.5</h2>
-  <div class="model-source">Cloud — OpenAI — Almost Pass (C) — Strings detached from frame</div>
+  <div class="model-source">Cloud — OpenAI — Almost Pass (C) — Strings detached from frame, gravity too low</div>
   <iframe class="demo-frame" src="Newtons_cradle-ChatGPT5_5.html" loading="lazy"></iframe>
 </div>
 
