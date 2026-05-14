@@ -24,17 +24,18 @@ Mostlysane wraps the [llama-server API](https://github.com/ggml-org/llama.cpp) �
 
 ```bash
 # 1. Build our fork (one-time)
-git clone https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git
-cd llama.cpp-Ternary-1.58Bit-and-TurboQuant
+mkdir -p ~/AI
+git clone https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git ~/AI/MostlysaneAI
+cd ~/AI/MostlysaneAI
+mkdir build && cd build
 cmake .. -DGGML_CUDA=ON
 make -j$(nproc)
 
 # 2. Use the web app to get your config
-# → https://lyndonblack.github.io/MostlysaneAI/
+# → https://ai.mostlysane.co.nz/
 
-# 3. Run the generated command
-cd llama.cpp-Ternary-1.58Bit-and-TurboQuant
-./build/bin/llama-server <your-config>
+# 3. Run the generated command (paths are absolute, use from anywhere)
+~/AI/MostlysaneAI/build/bin/llama-server <your-full-config>
 ```
 
 ## Project structure

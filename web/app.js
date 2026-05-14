@@ -7,7 +7,8 @@ const OS_CONFIG = {
     installPkg: 'sudo apt update && sudo apt install -y build-essential cmake',
     installCuda: 'sudo apt install -y nvidia-cuda-toolkit',
     binary: './build/bin/llama-server',
-    buildCmd: `git clone https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git\ncd llama.cpp-Ternary-1.58Bit-and-TurboQuant\nmkdir build && cd build\ncmake .. -DGGML_CUDA=ON\nmake -j$(nproc)`,
+    buildCmd: `mkdir -p ~/AI && git clone https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git ~/AI/MostlysaneAI
+cd ~/AI/MostlysaneAI\nmkdir build && cd build\ncmake .. -DGGML_CUDA=ON\nmake -j$(nproc)`,
     modelDir: '~/AI/models/',
     backend: 'CUDA (NVIDIA)',
     detect: /linux.*ubuntu|debian/i
@@ -17,7 +18,8 @@ const OS_CONFIG = {
     installPkg: 'sudo dnf install -y cmake gcc-c++',
     installCuda: 'sudo dnf install -y cuda-toolkit',
     binary: './build/bin/llama-server',
-    buildCmd: `git clone https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git\ncd llama.cpp-Ternary-1.58Bit-and-TurboQuant\nmkdir build && cd build\ncmake .. -DGGML_CUDA=ON\nmake -j$(nproc)`,
+    buildCmd: `mkdir -p ~/AI && git clone https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git ~/AI/MostlysaneAI
+cd ~/AI/MostlysaneAI\nmkdir build && cd build\ncmake .. -DGGML_CUDA=ON\nmake -j$(nproc)`,
     modelDir: '~/AI/models/',
     backend: 'CUDA (NVIDIA)',
     detect: /fedora|rhel|centos/i
@@ -27,7 +29,8 @@ const OS_CONFIG = {
     installPkg: 'sudo pacman -S --needed base-devel cmake',
     installCuda: 'sudo pacman -S cuda',
     binary: './build/bin/llama-server',
-    buildCmd: `git clone https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git\ncd llama.cpp-Ternary-1.58Bit-and-TurboQuant\nmkdir build && cd build\ncmake .. -DGGML_CUDA=ON\nmake -j$(nproc)`,
+    buildCmd: `mkdir -p ~/AI && git clone https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git ~/AI/MostlysaneAI
+cd ~/AI/MostlysaneAI\nmkdir build && cd build\ncmake .. -DGGML_CUDA=ON\nmake -j$(nproc)`,
     modelDir: '~/AI/models/',
     backend: 'CUDA (NVIDIA)',
     detect: /arch/i
@@ -37,7 +40,8 @@ const OS_CONFIG = {
     installPkg: 'brew install cmake',
     installCuda: null,
     binary: './build/bin/llama-server',
-    buildCmd: `git clone https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git\ncd llama.cpp-Ternary-1.58Bit-and-TurboQuant\nmkdir build && cd build\ncmake .. -DGGML_METAL=ON\nmake -j$(sysctl -n hw.logicalcpu)`,
+    buildCmd: `mkdir -p ~/AI && git clone https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git ~/AI/MostlysaneAI
+cd ~/AI/MostlysaneAI\nmkdir build && cd build\ncmake .. -DGGML_METAL=ON\nmake -j$(sysctl -n hw.logicalcpu)`,
     modelDir: '~/AI/models/',
     backend: 'Metal (Apple GPU)',
     detect: /mac|darwin/i
@@ -46,7 +50,8 @@ const OS_CONFIG = {
     label: 'Windows 10 / 11', icon: '🪟',
     installPkg: null, installCuda: null,
     binary: 'build\\bin\\Release\\llama-server.exe',
-    buildCmd: `# Open "x64 Native Tools Command Prompt for VS 2022"\ngit clone https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git\ncd llama.cpp-Ternary-1.58Bit-and-TurboQuant\nmkdir build && cd build\ncmake .. -DGGML_CUDA=ON\nmsbuild ALL_BUILD.vcxproj /p:Configuration=Release`,
+    buildCmd: `# Open "x64 Native Tools Command Prompt for VS 2022"\nmkdir -p ~/AI && git clone https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git ~/AI/MostlysaneAI
+cd ~/AI/MostlysaneAI\nmkdir build && cd build\ncmake .. -DGGML_CUDA=ON\nmsbuild ALL_BUILD.vcxproj /p:Configuration=Release`,
     modelDir: '%USERPROFILE%\\AI\\models\\',
     backend: 'CUDA (NVIDIA)',
     steps: [
@@ -922,7 +927,7 @@ function buildCmd(model, ctx, wantVision) {
   const platform = document.getElementById('platform').value;
   const isApu = platform === 'apu';
 
-  const BINARY = '~/AI/llama.cpp-Ternary-1.58Bit-and-TurboQuant/build/bin/llama-server';
+  const BINARY = '~/AI/MostlysaneAI/build/bin/llama-server';
   const f = md + getVariantFile(model);
 
   const flags = [];
@@ -953,7 +958,7 @@ function buildCmd(model, ctx, wantVision) {
 function buildCalibrateCmd(model) {
   if (!model.entropy_profile) return '';
   const file = getVariantFile(model);
-  return '~/AI/llama.cpp-Ternary-1.58Bit-and-TurboQuant/build/bin/llama-entropy-calibrate -m ~/AI/models/' + file + ' -ngl ' + model.ngl + ' -c 4096 -b 4096';
+  return '~/AI/MostlysaneAI/build/bin/llama-entropy-calibrate -m ~/AI/models/' + file + ' -ngl ' + model.ngl + ' -c 4096 -b 4096';
 }
 
 
