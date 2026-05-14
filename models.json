@@ -2,6 +2,7 @@
   {
     "id": "qwen36",
     "name": "Qwen3.6 35B A3B",
+    "complexity": 5,
     "order": 1,
     "mmproj": "mmproj-Qwen3.6-35B-A3B-F16.gguf",
     "entropy_profile": "entropy_profile_qwen_book.json",
@@ -29,6 +30,7 @@
   {
     "id": "qwen3vl",
     "name": "Qwen3-VL 30B A3B",
+    "complexity": 4,
     "order": 2,
     "mmproj": "mmproj-Qwen_Qwen3-VL-30B-A3B-Instruct-f16.gguf",
     "entropy_profile": "entropy_profile_qwen3vl.json",
@@ -56,6 +58,7 @@
   {
     "id": "ministral",
     "name": "Ministral-3-3B",
+    "complexity": 3,
     "order": 3,
     "mmproj": "mmproj-mistralai_Ministral-3-3B-Instruct-2512-f16.gguf",
     "entropy_profile": "entropy_profile_ministral3_book.json",
@@ -81,6 +84,7 @@
   {
     "id": "gemma4",
     "name": "Gemma-4-E2B 4.6B",
+    "complexity": 4,
     "order": 4,
     "mmproj": "mmproj-google_gemma-4-E2B-it-f16.gguf",
     "entropy_profile": "entropy_profile_gemma4_book.json",
@@ -105,6 +109,7 @@
   {
     "id": "bonsai",
     "name": "Bonsai 8B Q2_0",
+    "complexity": 3,
     "order": 5,
     "mmproj": null,
     "entropy_profile": "entropy_profile_bonsai.json",
@@ -130,6 +135,7 @@
   {
     "id": "llama32",
     "name": "Llama 3.2 3B",
+    "complexity": 2,
     "order": 6,
     "mmproj": null,
     "entropy_profile": null,
@@ -152,6 +158,7 @@
   {
     "id": "phi35",
     "name": "Phi-3.5 Mini 3.8B",
+    "complexity": 2,
     "order": 7,
     "mmproj": null,
     "entropy_profile": null,
@@ -174,6 +181,7 @@
   {
     "id": "qwen25",
     "name": "Qwen2.5 1.5B",
+    "complexity": 1,
     "order": 8,
     "mmproj": null,
     "entropy_profile": null,

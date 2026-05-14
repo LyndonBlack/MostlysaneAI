@@ -119,6 +119,50 @@ const PLATFORM_CONFIG = {
 };
 
 // ─────────────────────────────────────────────────
+//  Usage tier definitions
+// ─────────────────────────────────────────────────
+const USAGE_TIERS = [
+  { id: 1, label: 'Quick Text',
+    desc: 'Best for fixing grammar, simple formatting, and rapid chat.',
+    maxContext: 16384 },
+  { id: 2, label: 'Basic Assistant',
+    desc: 'Handles short emails, simple lists, and basic definitions.',
+    maxContext: 32768 },
+  { id: 3, label: 'Everyday Smart',
+    desc: 'Good for creative writing, code review, and general advice.',
+    maxContext: 65536 },
+  { id: 4, label: 'Complex Logic',
+    desc: 'Solves harder problems, multi-step tasks, web app creation, and detailed analysis.',
+    maxContext: 999999999 },
+  { id: 5, label: 'Deep Thinker',
+    desc: 'Best for complex coding, deep reasoning, massive documents, and advanced research.',
+    maxContext: 999999999 }
+];
+
+// ─────────────────────────────────────────────────
+//  Usage tier helpers
+// ─────────────────────────────────────────────────
+function getUsageTier() {
+  const el = document.getElementById('usage-tier');
+  if (!el) return 3;
+  return parseInt(el.value) || 3;
+}
+
+function setUsageTierDesc() {
+  const el = document.getElementById('usage-tier-desc');
+  if (!el) return;
+  const tier = getUsageTier();
+  const t = USAGE_TIERS.find(x => x.id === tier) || USAGE_TIERS[2];
+  el.innerHTML = '<strong>' + t.label + ':</strong> ' + t.desc;
+}
+
+function onUsageTierChange() {
+  SELECTED_MODEL_ID = null;
+  setUsageTierDesc();
+  updateConfig();
+}
+
+// ─────────────────────────────────────────────────
 //  Effective VRAM (platform-aware)
 // ─────────────────────────────────────────────────
 function getEffectiveVram() {
@@ -128,8 +172,6 @@ function getEffectiveVram() {
   if (platform === 'apple') return Math.max(1000, vramGb * 1000 - 6000);
   return vramGb * 1000;
 }
-
-
 
 // ─────────────────────────────────────────────────
 //  State
@@ -145,7 +187,7 @@ let panelOutsideHandler = null;
 // ─────────────────────────────────────────────────
 async function loadModels() {
   try {
-    const url = window.location.origin + '/models.json';
+    const url = 'models.json';
     const res = await fetch(url);
     if (!res.ok) {
       throw new Error('HTTP ' + res.status + ': ' + res.statusText);
@@ -166,7 +208,7 @@ async function loadModels() {
         + '<p style="font-size:0.85rem;color:var(--orange);margin-top:0.5rem">'
         + (err.message || err) + '</p>'
         + '<p style="font-size:0.85rem;color:var(--text-muted);margin-top:0.5rem">URL: <code>'
-        + window.location.origin + '/models.json</code></p>';
+        + window.location.protocol + '//' + window.location.host + window.location.pathname.replace(/[^/]*$/, '') + 'models.json</code></p>';
     } else {
       document.body.insertAdjacentHTML('afterbegin',
         '<div style="background:#f85149;color:#fff;padding:1rem;font-family:sans-serif">'
@@ -376,7 +418,7 @@ curl -L -o ${os.modelDir}${f} ${hfUrl}</div>
   }
 
   html += `</ol><hr><p style="font-size:0.9rem;color:var(--text-muted)">
-    📦 One-liner installer coming soon — <code>curl -sSL mostlysane.ai/install.sh | bash</code>
+    💡 Prefer handsfree? Use the <a href="#" onclick="document.getElementById('quickstart-card').scrollIntoView({behavior:'smooth'});return false" style="color:var(--accent)">one-liner installer</a> at the top of the page.
   </p>`;
   document.getElementById('setup-steps').innerHTML = html;
 
@@ -403,10 +445,17 @@ curl -L -o ${os.modelDir}${f} ${hfUrl}</div>
 //  Estimates
 // ─────────────────────────────────────────────────
 function getContextForModel(model, vramMib) {
-  const rawGb = parseInt(document.getElementById('gpu').value);
-  if (rawGb >= 24) return model.max_ctx;
-  if (model.id === 'qwen36' || model.id === 'qwen3vl') return 200000;
-  return Math.min(model.max_ctx, 131072);
+  const tier = getUsageTier();
+  // Tiers 4 and 5 don't cap by tier — use available VRAM logic only
+  if (tier >= 4) {
+    const rawGb = parseInt(document.getElementById('gpu').value);
+    if (rawGb >= 24) return model.max_ctx;
+    if (model.id === 'qwen36' || model.id === 'qwen3vl') return 200000;
+    return Math.min(model.max_ctx, 131072);
+  }
+  // Tiers 1-3 cap by usage tier
+  const tierCtx = USAGE_TIERS.find(x => x.id === tier).maxContext;
+  return Math.min(model.max_ctx, tierCtx);
 }
 
 function estimateVram(model, ctx, wantVision) {
@@ -662,6 +711,7 @@ function renderModelSelector() {
   const vramMib = getEffectiveVram();
   const ram = parseInt(document.getElementById('ram').value);
   const vision = document.getElementById('vision').value === '1';
+  const tier = getUsageTier();
   const viable = getViableModels(vramMib, ram, vision);
   const container = document.getElementById('model-selector');
 
@@ -671,6 +721,13 @@ function renderModelSelector() {
   }
 
   if (!SELECTED_MODEL_ID || !viable.find(m => m.id === SELECTED_MODEL_ID)) {
+    // Sort by best match to usage tier: closest complexity wins
+    viable.sort(function(a, b) {
+      var da = Math.abs((a.complexity || 3) - tier);
+      var db = Math.abs((b.complexity || 3) - tier);
+      if (da !== db) return da - db;
+      return b.order - a.order; // among equal distance, prefer higher order
+    });
     SELECTED_MODEL_ID = viable[0].id;
     const m = MODELS.find(x => x.id === SELECTED_MODEL_ID);
     if (m && m.variants && !SELECTED_VARIANTS[SELECTED_MODEL_ID]) {
@@ -803,6 +860,18 @@ function buildCalibrateCmd(model) {
 }
 
 
+function renderCommandText(blockId, text) {
+  const block = document.getElementById(blockId);
+  if (!block) return;
+  // Wrap each space-separated token in a no-break span
+  // so lines only break at spaces, never mid-token at hyphens
+  var html = text.split(' ').map(function(t) {
+    return '<span class="tok">' + t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span>';
+  }).join(' ');
+  block.innerHTML = html;
+  addCopyButton(blockId, text);
+}
+
 function addCopyButton(blockId, text) {
   const block = document.getElementById(blockId);
   if (!block) return;
@@ -835,8 +904,7 @@ function updateCommand() {
   const ctx = getContextForModel(model, vramMib);
 
   const cmdText = buildCmd(model, ctx, vision);
-  document.getElementById('command').textContent = cmdText;
-  addCopyButton('command', cmdText);
+  renderCommandText('command', cmdText);
 
   // Update model path note for current OS
   const osKey = document.getElementById('os').value;
@@ -849,8 +917,7 @@ function updateCommand() {
     document.getElementById('entropy-note').innerHTML =
       `One-time calibration for <code>${model.entropy_profile}</code>. Already committed in our fork.`;
     const calText = buildCalibrateCmd(model);
-    document.getElementById('entropy-command').textContent = calText;
-    addCopyButton('entropy-command', calText);
+    renderCommandText('entropy-command', calText);
   } else {
     document.getElementById('entropy-card').classList.add('hidden');
   }
@@ -892,6 +959,7 @@ function updateConfig() {
   renderMemoryBreakdown();
   updateCommand();
   updateInstallGuide();
+  setUsageTierDesc();
 }
 
 // ─────────────────────────────────────────────────

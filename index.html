@@ -66,6 +66,18 @@
         <span class="chevron" id="model-chevron">▾</span>
       </button>
     </div>
+    <div class="usage-tier-section">
+      <label for="usage-tier">Your Usage</label>
+      <input type="range" id="usage-tier" min="1" max="5" value="3" oninput="onUsageTierChange()" step="1">
+      <div class="usage-tier-labels">
+        <span>Quick</span>
+        <span>Basic</span>
+        <span> Smart</span>
+        <span>Complex</span>
+        <span>Deep</span>
+      </div>
+      <p id="usage-tier-desc" class="usage-tier-desc">Good for creative writing, code review, and general advice.</p>
+    </div>
     <div id="model-selector"></div>
     <div id="model-panel" class="selector-panel hidden"></div>
     <div id="notes"></div>
