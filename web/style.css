@@ -91,16 +91,15 @@ select:focus, input:focus { outline: none; border-color: var(--accent); }
   box-shadow: 0 0 0 1px var(--accent);
 }
 .usage-tier-labels {
-  display: flex;
-  justify-content: space-between;
-  padding: 0 9px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  width: 96%;
+  margin: 0 auto 0.5rem;
   font-size: 0.75rem;
   color: var(--text-muted);
-  margin-bottom: 0.5rem;
 }
 .usage-tier-labels span {
   text-align: center;
-  flex: 0 0 auto;
 }
 .usage-tier-desc {
   font-size: 0.85rem;
