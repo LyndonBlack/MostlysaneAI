@@ -58,8 +58,9 @@ nav .links a.active { color: var(--accent); }
     <option value="apu">Integrated / CPU only</option>
   </select>
 
-  <label for="gpu">GPU Model</label>
+  <label for="gpu">GPU / Chip <span id="gpu-hint" style="font-weight:normal;color:#8b949e;font-size:0.85rem"></span></label>
   <select id="gpu" onchange="onGpuChange()"></select>
+  <p id="gpu-compute-note" class="input-note hidden" style="margin:-0.25rem 0 0.75rem 0;font-size:0.8rem;color:var(--text-muted)"></p>
 
   <label for="ram">System RAM</label>
   <select id="ram" onchange="updateConfig()">

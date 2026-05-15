@@ -516,6 +516,8 @@ code {
   margin-top: 0.5rem;
 }
 
+.input-note { font-size:0.8rem; color:var(--text-muted); margin:-0.25rem 0 0.75rem 0; }
+
 /* ── Card header with dropdown button ── */
 .card-header {
   display: flex;
