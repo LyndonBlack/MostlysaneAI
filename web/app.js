@@ -85,14 +85,24 @@ const PLATFORM_CONFIG = {
     label: 'Apple (Metal)',
     backend: 'Metal (Apple GPU)',
     gpus: [
-      { v: 8, label: 'Apple Silicon — 8 GB unified' },
-      { v: 16, label: 'Apple Silicon — 16 GB unified' },
-      { v: 24, label: 'Apple Silicon — 24 GB unified' },
-      { v: 32, label: 'Apple Silicon — 32 GB unified' },
-      { v: 48, label: 'Apple Silicon — 48 GB unified' },
-      { v: 64, label: 'Apple Silicon — 64 GB unified' },
-      { v: 96, label: 'Apple Silicon — 96 GB unified' },
-      { v: 128, label: 'Apple Silicon — 128 GB unified' }
+      { compute: 1, label: 'M1' },
+      { compute: 3, label: 'M1 Pro' },
+      { compute: 4, label: 'M1 Max' },
+      { compute: 5, label: 'M1 Ultra' },
+      { compute: 2, label: 'M2' },
+      { compute: 3, label: 'M2 Pro' },
+      { compute: 4, label: 'M2 Max' },
+      { compute: 5, label: 'M2 Ultra' },
+      { compute: 2, label: 'M3' },
+      { compute: 3, label: 'M3 Pro' },
+      { compute: 4, label: 'M3 Max' },
+      { compute: 5, label: 'M3 Ultra' },
+      { compute: 3, label: 'M4' },
+      { compute: 4, label: 'M4 Pro' },
+      { compute: 5, label: 'M4 Max' },
+      { compute: 3, label: 'M5' },
+      { compute: 4, label: 'M5 Pro' },
+      { compute: 5, label: 'M5 Max' }
     ]
   },
   amd: {
@@ -200,10 +210,16 @@ const GPU_SYSTEM_OVERHEAD = {
 };
 
 function getEffectiveVram() {
-  const vramGb = parseInt(document.getElementById('gpu').value);
   const platform = document.getElementById('platform').value;
   // APU/integrated: no dedicated GPU VRAM — CPU-only models only
   if (platform === 'apu') return 100;
+  // Apple Silicon: unified memory — VRAM = system RAM minus system overhead
+  if (platform === 'apple') {
+    const ramGb = parseInt(document.getElementById('ram').value);
+    const overhead = GPU_SYSTEM_OVERHEAD.apple;
+    return Math.max(500, ramGb * 1000 - overhead);
+  }
+  const vramGb = parseInt(document.getElementById('gpu').value);
   const overhead = GPU_SYSTEM_OVERHEAD[platform] || 700;
   return Math.max(500, vramGb * 1000 - overhead);
 }
@@ -285,6 +301,18 @@ function detectOS() {
 // ─────────────────────────────────────────────────
 //  Platform detection & GPU options
 // ─────────────────────────────────────────────────
+function getComputePower() {
+  const platform = document.getElementById('platform').value;
+  if (platform === 'apple') {
+    const gpu = document.getElementById('gpu');
+    const idx = gpu.selectedIndex;
+    if (idx >= 0 && gpu.options[idx] && gpu.options[idx].dataset.compute) {
+      return parseInt(gpu.options[idx].dataset.compute) || 3;
+    }
+  }
+  return 5; // Non-Apple: assume full compute power
+}
+
 function updateGpuOptions() {
   const platform = document.getElementById('platform').value;
   const cfg = PLATFORM_CONFIG[platform];
@@ -293,18 +321,44 @@ function updateGpuOptions() {
   select.innerHTML = '';
   cfg.gpus.forEach(function(g) {
     var opt = document.createElement('option');
-    opt.value = g.v;
+    if (g.compute !== undefined) {
+      opt.value = g.compute;
+      opt.dataset.compute = g.compute;
+    } else {
+      opt.value = g.v;
+    }
     opt.textContent = g.label;
     select.appendChild(opt);
   });
   // Set a sensible default GPU (not the smallest)
-  const defaults = { nvidia: 2, apple: 1, amd: 0, intel: 0, apu: 0 };
+  const defaults = { nvidia: 2, apple: 12, amd: 0, intel: 0, apu: 0 };
   var idx = defaults[platform] || 0;
   if (select.options[idx]) select.selectedIndex = idx;
+
+  // Update contextual hints for Apple chip selection
+  updateGpuHint();
+}
+
+function updateGpuHint() {
+  const platform = document.getElementById('platform').value;
+  const hint = document.getElementById('gpu-hint');
+  const note = document.getElementById('gpu-compute-note');
+  if (!hint || !note) return;
+  if (platform === 'apple') {
+    hint.textContent = '(chip model)';
+    var cp = getComputePower();
+    var descs = { 1:'light models only (Ministral, Llama 3.2)', 2:'mid-range models work (Ministral, Gemma-4)', 3:'handles most models well', 4:'strong — dense & MoE both run well', 5:'beast — any model flies' };
+    note.textContent = '🔋 Compute power ' + cp + '/5 — ' + (descs[cp] || '');
+    note.classList.remove('hidden');
+  } else {
+    hint.textContent = '';
+    note.classList.add('hidden');
+  }
 }
 
 function onGpuChange() {
   SELECTED_MODEL_ID = null;
+  updateGpuHint();
   updateConfig();
 }
 
@@ -805,7 +859,15 @@ function renderModelSelector() {
 
   if (!SELECTED_MODEL_ID || !viable.find(m => m.id === SELECTED_MODEL_ID)) {
     // Sort by best match to usage tier: closest complexity wins
+    var platform = document.getElementById('platform').value;
+    const computePower = getComputePower();
     viable.sort(function(a, b) {
+      // Apple: chip power affects model type preference
+      if (platform === 'apple' && computePower <= 2) {
+        // Weak chips: dense models preferred (MoE expert layers bottleneck on slow CPU cores)
+        if (!a.cpu_moe && b.cpu_moe) return -1;
+        if (a.cpu_moe && !b.cpu_moe) return 1;
+      }
       var da = Math.abs((a.complexity || 3) - tier);
       var db = Math.abs((b.complexity || 3) - tier);
       if (da !== db) return da - db;
@@ -837,9 +899,16 @@ function renderMemoryBreakdown() {
     return;
   }
 
-  const vramGb = parseInt(document.getElementById('gpu').value);
   const platform = document.getElementById('platform').value;
-  const rawVram = platform === 'apu' ? 0 : vramGb * 1000;
+  let rawVram;
+  if (platform === 'apu') {
+    rawVram = 0;
+  } else if (platform === 'apple') {
+    // Apple Silicon uses unified memory — from RAM dropdown
+    rawVram = parseInt(document.getElementById('ram').value) * 1000;
+  } else {
+    rawVram = parseInt(document.getElementById('gpu').value) * 1000;
+  }
   const vramMib = getEffectiveVram();
   const systemOverhead = platform !== 'apu' ? rawVram - vramMib : 0;
   const ram = parseInt(document.getElementById('ram').value);
