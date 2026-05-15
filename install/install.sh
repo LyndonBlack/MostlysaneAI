@@ -286,16 +286,21 @@ else
   BACKEND_FLAGS="-ngl 99"
 fi
 
-# Entropy profile: only on non-Metal (Metal doesn't support TurboQuant K types)
-ENTROPY_FLAG=""
-if [ "$PLATFORM" != "macos" ]; then
+# macOS/Metal: skip TurboQuant flags + warmup (Metal has no TurboQuant shaders)
+# Also force F16 K/V cache explicitly to avoid auto-detection issues
+META_FLAGS=""
+if [ "$PLATFORM" = "macos" ]; then
+  # Metal can't run the warmup pass with TurboQuant types in the KV cache
+  META_FLAGS="--no-warmup -ctk f16 -ctv f16"
+else
+  # Linux/non-Metal: entropy profile is safe
   ENTROPY_FILE="$(resolve_entropy_file "$MODEL")"
   if [ -n "$ENTROPY_FILE" ] && [ -f "$MODEL_DIR/$ENTROPY_FILE" ]; then
-    ENTROPY_FLAG="--entropy-profile $MODEL_DIR/$ENTROPY_FILE"
+    META_FLAGS="--entropy-profile $MODEL_DIR/$ENTROPY_FILE"
   fi
 fi
 
-RUN_CMD="$LLAMA_BIN -m $MODEL_DIR/$MODEL $BACKEND_FLAGS $ENTROPY_FLAG --host 127.0.0.1 --port 8080"
+RUN_CMD="$LLAMA_BIN -m $MODEL_DIR/$MODEL $BACKEND_FLAGS $META_FLAGS --host 127.0.0.1 --port 8080"
 # Squeeze multiple spaces
 RUN_CMD="$(echo "$RUN_CMD" | tr -s ' ')"
 
