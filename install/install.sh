@@ -184,12 +184,13 @@ else
         exit 1
       fi ;;
     macos)
-      if command -v brew &>/dev/null; then
-        brew install cmake
-      else
-        echo "⚠️   Homebrew not found. Install cmake from https://cmake.org/download/"
-        exit 1
-      fi ;;
+      if ! command -v brew &>/dev/null; then
+        echo "   Installing Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        # Add to PATH for the current session
+        eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv 2>/dev/null || true)"
+      fi
+      brew install cmake ;;
   esac
   echo "✅  Dependencies ready."
   echo ""
