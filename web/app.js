@@ -383,6 +383,12 @@ function getVariant(model) {
   return model.variants.find(v => v.quant === q) || model.variants[0];
 }
 
+// Check if any variant of a model uses Q2_0 (custom fork type, Metal-incompatible)
+function variantUsesQ2(model) {
+  if (!model.variants) return false;
+  return model.variants.some(function(v) { return v.quant === 'Q2_0'; });
+}
+
 function getVariantFile(model) {
   const v = getVariant(model);
   if (v) return v.file;
@@ -863,10 +869,17 @@ function renderModelSelector() {
     const computePower = getComputePower();
     viable.sort(function(a, b) {
       // Apple: chip power affects model type preference
-      if (platform === 'apple' && computePower <= 2) {
+      if (platform === 'apple') {
+        // Push Q2_0 models to bottom (custom fork type, Metal can't handle)
+        var aCompat = !variantUsesQ2(a);
+        var bCompat = !variantUsesQ2(b);
+        if (aCompat && !bCompat) return -1;
+        if (!aCompat && bCompat) return 1;
         // Weak chips: dense models preferred (MoE expert layers bottleneck on slow CPU cores)
-        if (!a.cpu_moe && b.cpu_moe) return -1;
-        if (a.cpu_moe && !b.cpu_moe) return 1;
+        if (computePower <= 2) {
+          if (!a.cpu_moe && b.cpu_moe) return -1;
+          if (a.cpu_moe && !b.cpu_moe) return 1;
+        }
       }
       var da = Math.abs((a.complexity || 3) - tier);
       var db = Math.abs((b.complexity || 3) - tier);

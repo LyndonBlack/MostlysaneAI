@@ -287,10 +287,16 @@ else
 fi
 
 # macOS/Metal: skip TurboQuant flags + warmup (Metal has no TurboQuant shaders)
-# Also force F16 K/V cache explicitly to avoid auto-detection issues
+# Also warn about Q2_0 models (our fork's custom type at position 42, Metal-incompatible)
+if [ "$PLATFORM" = "macos" ] && echo "$MODEL" | grep -qi "q2_0\|bonsai"; then
+  echo "⚠️   Note: This model uses a custom quant format (Q2_0) that may not work on macOS/Metal."
+  echo "    If the server crashes, try a standard model like Ministral-3-3B or Qwen3.6-35B instead."
+  echo "    See https://ai.mostlysane.co.nz/getstarted.html for compatible models."
+  echo ""
+fi
+
 META_FLAGS=""
 if [ "$PLATFORM" = "macos" ]; then
-  # Metal can't run the warmup pass with TurboQuant types in the KV cache
   META_FLAGS="--no-warmup -ctk f16 -ctv f16"
 else
   # Linux/non-Metal: entropy profile is safe
