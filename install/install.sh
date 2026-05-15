@@ -285,11 +285,13 @@ else
   BACKEND_FLAGS="-ngl 99"
 fi
 
-ENTROPY_FILE="$(resolve_entropy_file "$MODEL")"
-if [ -n "$ENTROPY_FILE" ] && [ -f "$MODEL_DIR/$ENTROPY_FILE" ]; then
-  ENTROPY_FLAG="--entropy-profile $MODEL_DIR/$ENTROPY_FILE"
-else
-  ENTROPY_FLAG=""
+# Entropy profile: only on non-Metal (Metal doesn't support TurboQuant K types)
+ENTROPY_FLAG=""
+if [ "$PLATFORM" != "macos" ]; then
+  ENTROPY_FILE="$(resolve_entropy_file "$MODEL")"
+  if [ -n "$ENTROPY_FILE" ] && [ -f "$MODEL_DIR/$ENTROPY_FILE" ]; then
+    ENTROPY_FLAG="--entropy-profile $MODEL_DIR/$ENTROPY_FILE"
+  fi
 fi
 
 RUN_CMD="$LLAMA_BIN -m $MODEL_DIR/$MODEL $BACKEND_FLAGS $ENTROPY_FLAG --host 127.0.0.1 --port 8080"
@@ -317,14 +319,29 @@ if [ -f "$MODEL_DIR/$MODEL" ]; then
     echo "    $RUN_CMD"
     echo ""
 
+    # Start server in background, poll until healthy, then open browser
+    # (Server takes foreground after browser opens)
+    echo "   Starting server..."
+    $RUN_CMD &
+    SERVER_PID=$!
+
+    echo "   Waiting for server to be ready..."
+    for i in $(seq 1 30); do
+      if curl -s -o /dev/null "http://localhost:8080/health" 2>/dev/null; then
+        echo "   Server is ready!"
+        break
+      fi
+      sleep 1
+    done
+
     # Open browser
     case "$PLATFORM" in
-      linux)  (xdg-open "http://localhost:8080" 2>/dev/null || true) & ;;
-      macos)  (open "http://localhost:8080" 2>/dev/null || true) & ;;
+      linux)  xdg-open "http://localhost:8080" 2>/dev/null || true ;;
+      macos)  open "http://localhost:8080" 2>/dev/null || true ;;
     esac
 
-    # Start server (runs in foreground — Ctrl+C to stop)
-    exec $RUN_CMD
+    # Bring server back to foreground
+    wait $SERVER_PID
   fi
 fi
 

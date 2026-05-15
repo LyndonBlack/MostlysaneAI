@@ -1012,9 +1012,12 @@ function buildCmd(model, ctx, wantVision) {
     flags.push('-ngl', String(model.ngl));
     if (model.cpu_moe) flags.push('--n-cpu-moe', String(cpuMoe));
     flags.push('--flash-attn', 'on');
-    flags.push('-ctk', 'q8_0', '-ctv', 'turbo3_0');
-    if (model.entropy_profile && isEntropyEnabled()) {
-      flags.push('--entropy-profile', model.entropy_profile, '--entropy-prune-ratio', '2.0');
+    // TurboQuant K/V and entropy: skip on Apple/Metal (Metal doesn't support TurboQuant types)
+    if (platform !== 'apple') {
+      flags.push('-ctk', 'q8_0', '-ctv', 'turbo3_0');
+      if (model.entropy_profile && isEntropyEnabled()) {
+        flags.push('--entropy-profile', model.entropy_profile, '--entropy-prune-ratio', '2.0');
+      }
     }
   }
   flags.push('--ctx-size', String(ctx));
