@@ -1,27 +1,35 @@
 # Build Mostlysane prebuilt binaries for all platforms
 #
-# Triggered on push to turboternary branch or manual dispatch.
-# Produces release-ready binaries with full CUDA/entropy/turboquant support.
+# Triggers:
+#   - Manual dispatch from GitHub Actions tab (recommended)
+#   - Push to main that changes this workflow file
 #
-# Output uploaded to:
-#   - GitHub Actions artifacts (always)
-#   - GitHub Release (only on tag push: v*)
-#
-# Download URL pattern:
+# Produces multi-platform binaries with full CUDA/entropy/turboquant support.
+# Binary URL pattern (for installer download):
 #   https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant/releases/latest/download/llama-server-{platform}-{backend}.tar.gz
+#
+# 1. Go to: https://github.com/LyndonBlack/MostlysaneAI/actions/workflows/build-binaries.yml
+# 2. Click "Run workflow"
+# 3. Optionally set a version tag (e.g. v1.0.0) to attach binaries to a release
 
 name: Build Mostlysane binaries
 
 on:
-  push:
-    branches: [turboternary]
-    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (e.g. v1.0.0). Leave blank for artifact-only build.'
+        required: false
+        type: string
+  push:
+    paths:
+      - '.github/workflows/build-binaries.yml'
+    branches: [main]
 
 jobs:
   build:
     strategy:
-      fail-fast: false   # don't cancel other builds if one fails
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -57,7 +65,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout turboternary branch
+      - name: Checkout turboternary branch (llama.cpp fork)
         uses: actions/checkout@v4
         with:
           repository: LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant
@@ -90,7 +98,6 @@ jobs:
 
       - name: Build
         env:
-          # Windows: cmake --build uses MSBuild which parallelizes automatically
           NPROC: ${{ (runner.os == 'Windows' && '') || '$(nproc)' }}
         run: |
           cd build
@@ -98,11 +105,10 @@ jobs:
 
       # ── Package ──
 
-      - name: Package binaries (Linux)
+      - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
           cd build/bin
-          # Include all useful binaries
           tar czf ../../${{ matrix.artifact_name }}.tar.gz \
             llama-server \
             llama-cli \
@@ -110,7 +116,7 @@ jobs:
           tar czf ../../${{ matrix.artifact_name }}.tar.gz \
             llama-server
 
-      - name: Package binaries (macOS)
+      - name: Package (macOS)
         if: runner.os == 'macOS'
         run: |
           cd build/bin
@@ -121,14 +127,13 @@ jobs:
           tar czf ../../${{ matrix.artifact_name }}.tar.gz \
             llama-server
 
-      - name: Package binaries (Windows)
+      - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $src = "build\bin\Release\"
           $dst = "${{ matrix.artifact_name }}.zip"
           Compress-Archive -Path "$src\llama-server.exe", "$src\llama-cli.exe", "$src\llama-entropy-calibrate.exe" -DestinationPath $dst -Force 2>$null
-          # Fallback: only llama-server if others missing
           if (-not (Test-Path $dst)) {
             Compress-Archive -Path "$src\llama-server.exe" -DestinationPath $dst -Force
           }
@@ -142,12 +147,15 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_name }}.${{ (matrix.compress == 'tar' && 'tar.gz') || 'zip' }}
 
-      # ── Upload to GitHub Release (only on tag) ──
+      # ── Upload to GitHub Release (only when version input is set) ──
 
-      - name: Upload to Release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Create Release
+        if: inputs.version != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.version }}
+          name: "Mostlysane ${{ inputs.version }}"
+          body: "Prebuilt llama-server binaries for all platforms."
           files: |
             ${{ matrix.artifact_name }}.${{ (matrix.compress == 'tar' && 'tar.gz') || 'zip' }}
           fail_on_unmatched_files: false
