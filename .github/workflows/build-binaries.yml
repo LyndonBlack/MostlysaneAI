@@ -131,7 +131,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          curl -sL -o build/bin/Release/run.bat \
+          curl.exe -sL -o build/bin/Release/run.bat `
             https://raw.githubusercontent.com/LyndonBlack/MostlysaneAI/main/install/run.bat
 
       # ── Package ──
