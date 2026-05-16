@@ -104,13 +104,14 @@ jobs:
       - name: Build
         run: |
           cd build
-          # Build only llama-server to avoid tool compilation issues
+          # Build only llama-server; macOS needs sysctl (no nproc)
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cmake --build . --config Release --target llama-server 2>&1 || \
-            cmake --build . --config Release --target llama-server 2>&1
+            cmake --build . --config Release --target llama-server
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            NPROC=$(sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
+            cmake --build . --config Release -j$NPROC --target llama-server
           else
-            cmake --build . --config Release -j$(nproc) --target llama-server 2>&1 || \
-            cmake --build . --config Release -j$(nproc) --target llama-server 2>&1
+            cmake --build . --config Release -j$(nproc) --target llama-server
           fi
         shell: bash
 
