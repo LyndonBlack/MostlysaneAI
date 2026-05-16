@@ -464,6 +464,107 @@ function resolveDownloadUrl(file) {
   return null;
 }
 
+// ─── Prebuilt download + setup method toggle ───
+
+// Detect browser platform for download button
+function detectBrowserPlatform() {
+  const ua = navigator.userAgent || navigator.platform || '';
+  if (/mac/i.test(ua) || /Macintosh|MacIntel|MacPPC|Mac68K/.test(ua)) return 'mac';
+  if (/win/i.test(ua) || /Win32|Win64|Windows/.test(ua)) return 'win';
+  if (/linux/i.test(ua)) return 'linux';
+  return 'linux'; // default
+}
+
+// Prebuilt download URL for detected platform
+function getPrebuiltUrl() {
+  const plat = detectBrowserPlatform();
+  switch (plat) {
+    case 'mac':  return 'https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant/releases/latest/download/llama-server-macos-metal.tar.gz';
+    case 'win':  return 'https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant/releases/latest/download/llama-server-windows-cpu.zip';
+    default:     return 'https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant/releases/latest/download/llama-server-linux-cpu.tar.gz';
+  }
+}
+
+function getPrebuiltFilename() {
+  const plat = detectBrowserPlatform();
+  switch (plat) {
+    case 'mac':  return 'llama-server-macos-metal.tar.gz';
+    case 'win':  return 'llama-server-windows-cpu.zip';
+    default:     return 'llama-server-linux-cpu.tar.gz';
+  }
+}
+
+function getPlatformLabel() {
+  const plat = detectBrowserPlatform();
+  switch (plat) {
+    case 'mac':  return 'macOS (Apple Silicon)';
+    case 'win':  return 'Windows';
+    default:     return 'Linux';
+  }
+}
+
+function getServerBinaryName() {
+  const plat = detectBrowserPlatform();
+  switch (plat) {
+    case 'win':  return 'llama-server.exe';
+    default:     return 'llama-server';
+  }
+}
+
+// Toggle between prebuilt download and build-from-source
+function toggleSetupMethod(method) {
+  var prebuiltSection = document.getElementById('prebuilt-section');
+  var sourceSection = document.getElementById('source-section');
+  var togglePrebuilt = document.getElementById('toggle-prebuilt');
+  var toggleSource = document.getElementById('toggle-source');
+
+  if (method === 'prebuilt') {
+    prebuiltSection.style.display = '';
+    sourceSection.style.display = 'none';
+    togglePrebuilt.style.background = 'var(--accent)';
+    togglePrebuilt.style.color = '#fff';
+    toggleSource.style.background = 'var(--bg-card)';
+    toggleSource.style.color = 'var(--text-muted)';
+  } else {
+    prebuiltSection.style.display = 'none';
+    sourceSection.style.display = '';
+    toggleSource.style.background = 'var(--accent)';
+    toggleSource.style.color = '#fff';
+    togglePrebuilt.style.background = 'var(--bg-card)';
+    togglePrebuilt.style.color = 'var(--text-muted)';
+  }
+}
+
+// Render the prebuilt download area
+function renderPrebuiltDownload() {
+  var area = document.getElementById('prebuilt-download-area');
+  if (!area) return;
+
+  var url = getPrebuiltUrl();
+  var fname = getPrebuiltFilename();
+  var plat = getPlatformLabel();
+  var serverBin = getServerBinaryName();
+
+  area.innerHTML = '' +
+    '<a href="' + url + '" download style="display:inline-block;padding:0.65rem 1.5rem;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;font-size:1rem;text-decoration:none;margin-bottom:0.75rem">' +
+    '⬇  Download for ' + plat +
+    '</a>' +
+    '<p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:0.5rem">' +
+    'Binary: <code>' + fname + '</code> (~50-80 MB)' +
+    '</p>';
+
+  // Set the run command (refers to run.sh / run.bat helper)
+  var cmdBlock = document.getElementById('prebuilt-run-cmd');
+  if (cmdBlock) {
+    var isWin = detectBrowserPlatform() === 'win';
+    var runHelper = isWin ? 'run.bat' : './run.sh';
+    var runCmd = isWin
+      ? 'Extract the zip, then double-click run.bat'
+      : runHelper + '  (or double-click run.sh in your file manager)';
+    cmdBlock.textContent = runCmd;
+  }
+}
+
 // ─────────────────────────────────────────────────
 //  Install guide
 // ─────────────────────────────────────────────────
@@ -1168,6 +1269,7 @@ function updateCommand() {
 }
 
 function updateConfig() {
+  renderPrebuiltDownload();
   const ram = parseInt(document.getElementById('ram').value);
   const vision = document.getElementById('vision').value === '1';
   const viable = getViableModels(getEffectiveVram(), ram, vision);

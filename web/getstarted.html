@@ -129,16 +129,46 @@ nav .links a.active { color: var(--accent); }
   </div>
 
   <div class="card" id="quickstart-card">
-    <h2>Handsfree Setup — Get Started with One Command</h2>
-    <p style="color:#8b949e;font-size:0.9rem;margin-bottom:0.75rem">
-      No manual steps. Just run this in your terminal.
-    </p>
-    <div class="command-block small" id="one-liner-cmd" style="margin-bottom:0.5rem"></div>
-    <div class="command-block small" id="one-liner-win" style="margin-bottom:0.5rem"></div>
-    <p style="color:var(--text-muted);font-size:0.85rem">
-      Installs dependencies, clones the Mostlysane fork, builds llama.cpp, and
-      optionally downloads a model. Use the manual guide below for custom setups.
-    </p>
+    <h2>Handsfree Setup</h2>
+
+    <!-- Setup method toggle -->
+    <div style="display:flex;gap:0.75rem;margin-bottom:1rem;align-items:center">
+      <span style="color:var(--text-muted);font-size:0.85rem;white-space:nowrap">Setup method:</span>
+      <label class="toggle-btn active" id="toggle-prebuilt" onclick="toggleSetupMethod('prebuilt')" style="cursor:pointer;padding:0.35rem 0.75rem;border-radius:6px;background:var(--accent);color:#fff;font-size:0.85rem;font-weight:500">
+        ⚡  Quick Start (download)
+      </label>
+      <label class="toggle-btn" id="toggle-source" onclick="toggleSetupMethod('source')" style="cursor:pointer;padding:0.35rem 0.75rem;border-radius:6px;background:var(--bg-card);color:var(--text-muted);font-size:0.85rem">
+        🔨  Build from Source
+      </label>
+    </div>
+
+    <!-- Prebuilt download section (default) -->
+    <div id="prebuilt-section">
+      <p style="color:#8b949e;font-size:0.9rem;margin-bottom:0.75rem">
+        Download a prebuilt binary — no compilers or build tools needed.
+        The package includes a helper script that downloads your model and
+        starts the server automatically.
+      </p>
+      <div id="prebuilt-download-area" style="margin-bottom:0.75rem"></div>
+      <div id="prebuilt-instructions" style="background:var(--bg-card);border-radius:8px;padding:0.75rem 1rem;border:1px solid var(--border);margin-bottom:0.5rem">
+        <p style="color:var(--text-muted);font-size:0.85rem">
+          Extract the zip, then run the helper script:
+        </p>
+        <div class="command-block small" id="prebuilt-run-cmd" style="margin-top:0.35rem"></div>
+      </div>
+      <p style="color:var(--text-muted);font-size:0.85rem">
+        Prefer building from source? Switch to "Build from Source" above.
+      </p>
+    </div>
+
+    <!-- Build from source section (hidden by default) -->
+    <div id="source-section" style="display:none">
+      <p style="color:#8b949e;font-size:0.9rem;margin-bottom:0.75rem">
+        Run this in your terminal to clone, compile, and set up.
+      </p>
+      <div class="command-block small" id="one-liner-cmd" style="margin-bottom:0.5rem"></div>
+      <div class="command-block small" id="one-liner-win" style="margin-bottom:0.5rem"></div>
+    </div>
   </div>
 
   <div class="card">

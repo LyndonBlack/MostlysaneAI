@@ -687,3 +687,12 @@ code {
     font-size: 0.75rem;
   }
 }
+
+/* Setup method toggle */
+.toggle-btn {
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+.toggle-btn:hover {
+  opacity: 0.85;
+}
