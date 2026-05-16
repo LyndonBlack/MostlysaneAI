@@ -14,6 +14,9 @@
 
 name: Build Mostlysane binaries
 
+permissions:
+  contents: write
+
 env:
   # Opt into Node.js 24 for GitHub Actions (default from June 2, 2026)
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -38,7 +41,8 @@ jobs:
         include:
           - os: ubuntu-latest
             label: linux-cuda
-            cmake_flags: -DGGML_CUDA=ON -DGGML_CUDA_NO_FA_ALLREDUCE=ON
+            # GGML_NATIVE=OFF forces explicit arch list (86-real for RTX 3070 Ti)
+            cmake_flags: -DGGML_CUDA=ON -DGGML_CUDA_NO_FA_ALLREDUCE=ON -DGGML_NATIVE=OFF
             artifact_name: llama-server-linux-cuda
             compress: tar
 
@@ -56,7 +60,7 @@ jobs:
 
           - os: windows-latest
             label: windows-cuda
-            cmake_flags: -DGGML_CUDA=ON -DGGML_CUDA_NO_FA_ALLREDUCE=ON
+            cmake_flags: -DGGML_CUDA=ON -DGGML_CUDA_NO_FA_ALLREDUCE=ON -DGGML_NATIVE=OFF
             artifact_name: llama-server-windows-cuda
             compress: zip
 
@@ -114,6 +118,22 @@ jobs:
           fi
         shell: bash
 
+      # ── Fetch run helper scripts from MostlysaneAI repo ──
+
+      - name: Download run.sh helper (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          curl -sL -o build/bin/run.sh \
+            https://raw.githubusercontent.com/LyndonBlack/MostlysaneAI/main/install/run.sh
+          chmod +x build/bin/run.sh
+
+      - name: Download run.bat helper (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          curl -sL -o build/bin/Release/run.bat \
+            https://raw.githubusercontent.com/LyndonBlack/MostlysaneAI/main/install/run.bat
+
       # ── Package ──
 
       - name: Package (Linux)
@@ -121,9 +141,8 @@ jobs:
         run: |
           cd build/bin
           echo "Files in build/bin:" && ls -la
-          # Package llama-server + all shared libraries (.so)
           tar czf ../../${{ matrix.artifact_name }}.tar.gz \
-            llama-server lib*.so* 2>/dev/null
+            llama-server run.sh lib*.so* 2>/dev/null
           echo "Packaged: $(ls -lh ../../${{ matrix.artifact_name }}.tar.gz)"
 
       - name: Package (macOS)
@@ -131,9 +150,8 @@ jobs:
         run: |
           cd build/bin
           echo "Files in build/bin:" && ls -la
-          # Package llama-server + all dylibs
           tar czf ../../${{ matrix.artifact_name }}.tar.gz \
-            llama-server *.dylib 2>/dev/null
+            llama-server run.sh *.dylib 2>/dev/null
           echo "Packaged: $(ls -lh ../../${{ matrix.artifact_name }}.tar.gz)"
 
       - name: Package (Windows)
@@ -142,10 +160,9 @@ jobs:
         run: |
           $src = "${{ github.workspace }}\build\bin\Release\"
           $dst = "${{ github.workspace }}\${{ matrix.artifact_name }}.zip"
-          # Use ${src} to avoid PowerShell parsing $src: scope prefix
           Write-Host "Files in ${src}:"
           Get-ChildItem "${src}" | Select-Object Name | Format-Table -AutoSize
-          # Package all runtime files (exe + dlls)
+          # Package exe + dlls + run.bat
           Compress-Archive -Path "${src}*" -DestinationPath $dst -Force
 
       # ── Upload to Actions artifacts (always) ──
