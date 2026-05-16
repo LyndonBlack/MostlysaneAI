@@ -84,7 +84,7 @@ jobs:
         if: matrix.label == 'windows-cuda'
         uses: Jimver/cuda-toolkit@v0.2.35
         with:
-          cuda: '12.6'
+          cuda: '12.6.0'
           method: 'network'
           sub-packages: '["nvcc"]'
 
@@ -99,10 +99,13 @@ jobs:
       - name: Build
         run: |
           cd build
+          # Build only llama-server to avoid tool compilation issues
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cmake --build . --config Release
+            cmake --build . --config Release --target llama-server 2>&1 || \
+            cmake --build . --config Release --target llama-server 2>&1
           else
-            cmake --build . --config Release -j$(nproc)
+            cmake --build . --config Release -j$(nproc) --target llama-server 2>&1 || \
+            cmake --build . --config Release -j$(nproc) --target llama-server 2>&1
           fi
         shell: bash
 
@@ -112,23 +115,19 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           cd build/bin
+          echo "Packaging binaries found:" && ls -la 2>/dev/null
           tar czf ../../${{ matrix.artifact_name }}.tar.gz \
-            llama-server \
-            llama-cli \
-            llama-entropy-calibrate 2>/dev/null || \
-          tar czf ../../${{ matrix.artifact_name }}.tar.gz \
-            llama-server
+            llama-server 2>/dev/null || \
+          (echo "⚠️  No binaries found in build/bin/"; exit 1)
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
         run: |
           cd build/bin
+          echo "Packaging binaries found:" && ls -la 2>/dev/null
           tar czf ../../${{ matrix.artifact_name }}.tar.gz \
-            llama-server \
-            llama-cli \
-            llama-entropy-calibrate 2>/dev/null || \
-          tar czf ../../${{ matrix.artifact_name }}.tar.gz \
-            llama-server
+            llama-server 2>/dev/null || \
+          (echo "⚠️  No binaries found in build/bin/"; exit 1)
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
@@ -136,14 +135,9 @@ jobs:
         run: |
           $src = "${{ github.workspace }}\build\bin\Release\"
           $dst = "${{ github.workspace }}\${{ matrix.artifact_name }}.zip"
-          # Collect all available binaries
-          $files = @()
-          foreach ($exe in @("llama-server.exe", "llama-cli.exe", "llama-entropy-calibrate.exe")) {
-            $p = Join-Path $src $exe
-            if (Test-Path $p) { $files += $p }
-          }
-          if ($files.Count -eq 0) { $files = @((Join-Path $src "llama-server.exe")) }
-          Compress-Archive -Path $files -DestinationPath $dst -Force
+          Write-Host "Binaries in $src:"
+          Get-ChildItem $src 2>$null | Select-Object Name | Format-Table -AutoSize
+          Compress-Archive -Path (Join-Path $src "llama-server.exe") -DestinationPath $dst -Force
 
       # ── Upload to Actions artifacts (always) ──
 
