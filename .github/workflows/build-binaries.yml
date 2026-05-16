@@ -34,7 +34,8 @@ jobs:
         include:
           - os: ubuntu-latest
             label: linux-cuda
-            cmake_flags: -DGGML_CUDA=ON
+            # CUDA_FA_ALLREDUCE=OFF avoids half conversion ambiguity in CUDA 12.3+
+            cmake_flags: -DGGML_CUDA=ON -DGGML_CUDA_FA_ALLREDUCE=OFF
             artifact_name: llama-server-linux-cuda
             compress: tar
 
@@ -52,7 +53,7 @@ jobs:
 
           - os: windows-latest
             label: windows-cuda
-            cmake_flags: -DGGML_CUDA=ON
+            cmake_flags: -DGGML_CUDA=ON -DGGML_CUDA_FA_ALLREDUCE=OFF
             artifact_name: llama-server-windows-cuda
             compress: zip
 
