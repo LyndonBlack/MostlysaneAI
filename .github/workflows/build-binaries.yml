@@ -1,0 +1,153 @@
+# Build Mostlysane prebuilt binaries for all platforms
+#
+# Triggered on push to turboternary branch or manual dispatch.
+# Produces release-ready binaries with full CUDA/entropy/turboquant support.
+#
+# Output uploaded to:
+#   - GitHub Actions artifacts (always)
+#   - GitHub Release (only on tag push: v*)
+#
+# Download URL pattern:
+#   https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant/releases/latest/download/llama-server-{platform}-{backend}.tar.gz
+
+name: Build Mostlysane binaries
+
+on:
+  push:
+    branches: [turboternary]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false   # don't cancel other builds if one fails
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-cuda
+            cmake_flags: -DGGML_CUDA=ON
+            artifact_name: llama-server-linux-cuda
+            compress: tar
+
+          - os: ubuntu-latest
+            label: linux-cpu
+            cmake_flags: ""
+            artifact_name: llama-server-linux-cpu
+            compress: tar
+
+          - os: macos-latest
+            label: macos-metal
+            cmake_flags: -DGGML_METAL=ON
+            artifact_name: llama-server-macos-metal
+            compress: tar
+
+          - os: windows-latest
+            label: windows-cuda
+            cmake_flags: -DGGML_CUDA=ON
+            artifact_name: llama-server-windows-cuda
+            compress: zip
+
+          - os: windows-latest
+            label: windows-cpu
+            cmake_flags: ""
+            artifact_name: llama-server-windows-cpu
+            compress: zip
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout turboternary branch
+        uses: actions/checkout@v4
+        with:
+          repository: LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant
+          ref: turboternary
+
+      # ── Install build tools ──
+
+      - name: Install CUDA (Linux)
+        if: matrix.label == 'linux-cuda'
+        run: |
+          sudo apt update -qq
+          sudo apt install -y -qq nvidia-cuda-toolkit
+          echo "CUDA installed: $(nvcc --version | tail -1)"
+
+      - name: Install CUDA (Windows)
+        if: matrix.label == 'windows-cuda'
+        uses: Jimver/cuda-toolkit@v0.2
+        with:
+          cuda: '12.6'
+          method: 'network'
+          sub-packages: '["nvcc"]'
+
+      # ── Build ──
+
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. ${{ matrix.cmake_flags }}
+
+      - name: Build
+        env:
+          # Windows: cmake --build uses MSBuild which parallelizes automatically
+          NPROC: ${{ (runner.os == 'Windows' && '') || '$(nproc)' }}
+        run: |
+          cd build
+          cmake --build . --config Release -j${{ env.NPROC }}
+
+      # ── Package ──
+
+      - name: Package binaries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd build/bin
+          # Include all useful binaries
+          tar czf ../../${{ matrix.artifact_name }}.tar.gz \
+            llama-server \
+            llama-cli \
+            llama-entropy-calibrate 2>/dev/null || \
+          tar czf ../../${{ matrix.artifact_name }}.tar.gz \
+            llama-server
+
+      - name: Package binaries (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd build/bin
+          tar czf ../../${{ matrix.artifact_name }}.tar.gz \
+            llama-server \
+            llama-cli \
+            llama-entropy-calibrate 2>/dev/null || \
+          tar czf ../../${{ matrix.artifact_name }}.tar.gz \
+            llama-server
+
+      - name: Package binaries (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $src = "build\bin\Release\"
+          $dst = "${{ matrix.artifact_name }}.zip"
+          Compress-Archive -Path "$src\llama-server.exe", "$src\llama-cli.exe", "$src\llama-entropy-calibrate.exe" -DestinationPath $dst -Force 2>$null
+          # Fallback: only llama-server if others missing
+          if (-not (Test-Path $dst)) {
+            Compress-Archive -Path "$src\llama-server.exe" -DestinationPath $dst -Force
+          }
+          Move-Item $dst ..\..\ -Force
+
+      # ── Upload to Actions artifacts (always) ──
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.${{ (matrix.compress == 'tar' && 'tar.gz') || 'zip' }}
+
+      # ── Upload to GitHub Release (only on tag) ──
+
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ matrix.artifact_name }}.${{ (matrix.compress == 'tar' && 'tar.gz') || 'zip' }}
+          fail_on_unmatched_files: false
