@@ -142,10 +142,11 @@ jobs:
         run: |
           $src = "${{ github.workspace }}\build\bin\Release\"
           $dst = "${{ github.workspace }}\${{ matrix.artifact_name }}.zip"
-          Write-Host "Files in $src:"
-          Get-ChildItem $src | Select-Object Name | Format-Table -AutoSize
+          # Use ${src} to avoid PowerShell parsing $src: scope prefix
+          Write-Host "Files in ${src}:"
+          Get-ChildItem "${src}" | Select-Object Name | Format-Table -AutoSize
           # Package all runtime files (exe + dlls)
-          Compress-Archive -Path "$src\*" -DestinationPath $dst -Force
+          Compress-Archive -Path "${src}*" -DestinationPath $dst -Force
 
       # ── Upload to Actions artifacts (always) ──
 
