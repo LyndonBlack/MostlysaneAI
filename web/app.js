@@ -102,7 +102,8 @@ const PLATFORM_CONFIG = {
       { compute: 5, label: 'M4 Max' },
       { compute: 3, label: 'M5' },
       { compute: 4, label: 'M5 Pro' },
-      { compute: 5, label: 'M5 Max' }
+      { compute: 5, label: 'M5 Max' },
+      { compute: 1, label: 'Intel Mac (x86_64, CPU)' }
     ]
   },
   amd: {
@@ -333,6 +334,10 @@ function updateGpuOptions() {
   // Set a sensible default GPU (not the smallest)
   const defaults = { nvidia: 2, apple: 12, amd: 0, intel: 0, apu: 0 };
   var idx = defaults[platform] || 0;
+  // Auto-select Intel Mac chip if browser is on an Intel Mac
+  if (platform === 'apple' && (/MacIntel/.test(navigator.platform) || /Intel.*Mac/.test(navigator.userAgent))) {
+    idx = cfg.gpus.length - 1; // last option = Intel Mac
+  }
   if (select.options[idx]) select.selectedIndex = idx;
 
   // Update contextual hints for Apple chip selection
@@ -347,7 +352,7 @@ function updateGpuHint() {
   if (platform === 'apple') {
     hint.textContent = '(chip model)';
     var cp = getComputePower();
-    var descs = { 1:'light models only (Ministral, Llama 3.2)', 2:'mid-range models work (Ministral, Gemma-4)', 3:'handles most models well', 4:'strong — dense & MoE both run well', 5:'beast — any model flies' };
+    var descs = { 1:'Intel Mac — CPU only, light models (Ministral, Gemma-4)', 2:'mid-range models work (Ministral, Gemma-4)', 3:'handles most models well', 4:'strong — dense & MoE both run well', 5:'beast — any model flies' };
     note.textContent = '🔋 Compute power ' + cp + '/5 — ' + (descs[cp] || '');
     note.classList.remove('hidden');
   } else {
@@ -469,7 +474,17 @@ function resolveDownloadUrl(file) {
 // Detect browser platform for download button
 function detectBrowserPlatform() {
   const ua = navigator.userAgent || navigator.platform || '';
-  if (/mac/i.test(ua) || /Macintosh|MacIntel|MacPPC|Mac68K/.test(ua)) return 'mac';
+  if (/mac/i.test(ua) || /Macintosh|MacIntel|MacPPC|Mac68K/.test(ua)) {
+    // MacARM = native Apple Silicon; also check user-selected Intel Mac chip
+    if (/MacARM/.test(navigator.platform) || /arm|aarch64/.test(ua)) return 'mac-arm';
+    // Check if user selected 'Intel Mac' in config dropdown
+    var gpuSelect = document.getElementById('gpu');
+    if (gpuSelect && gpuSelect.selectedIndex >= 0) {
+      var opt = gpuSelect.options[gpuSelect.selectedIndex];
+      if (opt && opt.text && opt.text.indexOf('Intel') >= 0) return 'mac-intel';
+    }
+    return 'mac-intel'; // default for MacIntel / Rosetta
+  }
   if (/win/i.test(ua) || /Win32|Win64|Windows/.test(ua)) return 'win';
   if (/linux/i.test(ua)) return 'linux';
   return 'linux'; // default
@@ -479,27 +494,30 @@ function detectBrowserPlatform() {
 function getPrebuiltUrl() {
   const plat = detectBrowserPlatform();
   switch (plat) {
-    case 'mac':  return 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-macos-metal.tar.gz';
-    case 'win':  return 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-windows-cpu.zip';
-    default:     return 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-linux-cpu.tar.gz';
+    case 'mac-arm':   return 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-macos-metal.tar.gz';
+    case 'mac-intel': return 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-macos-intel.tar.gz';
+    case 'win':       return 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-windows-cpu.zip';
+    default:          return 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-linux-cpu.tar.gz';
   }
 }
 
 function getPrebuiltFilename() {
   const plat = detectBrowserPlatform();
   switch (plat) {
-    case 'mac':  return 'llama-server-macos-metal.tar.gz';
-    case 'win':  return 'llama-server-windows-cpu.zip';
-    default:     return 'llama-server-linux-cpu.tar.gz';
+    case 'mac-arm':   return 'llama-server-macos-metal.tar.gz';
+    case 'mac-intel': return 'llama-server-macos-intel.tar.gz';
+    case 'win':       return 'llama-server-windows-cpu.zip';
+    default:          return 'llama-server-linux-cpu.tar.gz';
   }
 }
 
 function getPlatformLabel() {
   const plat = detectBrowserPlatform();
   switch (plat) {
-    case 'mac':  return 'macOS (Apple Silicon)';
-    case 'win':  return 'Windows';
-    default:     return 'Linux';
+    case 'mac-arm':   return 'macOS (Apple Silicon)';
+    case 'mac-intel': return 'macOS (Intel)';
+    case 'win':       return 'Windows';
+    default:          return 'Linux';
   }
 }
 
@@ -553,14 +571,20 @@ function renderPrebuiltDownload() {
     'Binary: <code>' + fname + '</code> (~50-80 MB)' +
     '</p>';
 
-  // Set the run command (refers to run.sh / run.bat helper)
+  // Set the run command (refers to run.command for macOS, run.bat for Windows)
   var cmdBlock = document.getElementById('prebuilt-run-cmd');
   if (cmdBlock) {
-    var isWin = detectBrowserPlatform() === 'win';
-    var runHelper = isWin ? 'run.bat' : './run.sh';
-    var runCmd = isWin
-      ? 'Extract the zip, then double-click run.bat'
-      : runHelper + '  (or double-click run.sh in your file manager)';
+    var plat = detectBrowserPlatform();
+    var isWin = plat === 'win';
+    var isMac = plat === 'mac-arm' || plat === 'mac-intel';
+    var runCmd;
+    if (isMac) {
+      runCmd = 'Extract the .tar.gz, then double-click run.command';
+    } else if (isWin) {
+      runCmd = 'Extract the zip, then double-click run.bat';
+    } else {
+      runCmd = 'Extract the .tar.gz, then run:  ./run.sh';
+    }
     cmdBlock.textContent = runCmd;
   }
 }
@@ -616,7 +640,16 @@ function updateInstallGuide() {
   // Build the right cmake flag based on platform + OS
   const platCfg = PLATFORM_CONFIG[document.getElementById('platform').value];
   const isMac = osKey === 'macos';
-  const backendFlag = isMac ? 'GGML_METAL=ON' : (platCfg && platCfg.backend.indexOf('CUDA') >= 0 ? 'GGML_CUDA=ON' : 'GGML_VULKAN=ON');
+  // Intel Macs: CPU-only (no Metal), Apple Silicon: Metal
+  const isIntelMac = isMac && document.getElementById('gpu') &&
+    document.getElementById('gpu').options[document.getElementById('gpu').selectedIndex] &&
+    (document.getElementById('gpu').options[document.getElementById('gpu').selectedIndex].text || '').indexOf('Intel') >= 0;
+  var backendFlag;
+  if (isMac) {
+    backendFlag = isIntelMac ? '' : 'GGML_METAL=ON';
+  } else {
+    backendFlag = platCfg && platCfg.backend.indexOf('CUDA') >= 0 ? 'GGML_CUDA=ON' : 'GGML_VULKAN=ON';
+  }
   const buildCmd = os.shell === 'powershell'
     ? 'cmake .. -D' + backendFlag + '\nmsbuild ALL_BUILD.vcxproj /p:Configuration=Release'
     : 'cmake .. -D' + backendFlag + '\nmake -j$(nproc)';
@@ -627,8 +660,10 @@ function updateInstallGuide() {
     <div class="command-block small">${os.buildCmd}</div>
   </li>`;
 
-  // Show backend note under build step if not CUDA
-  if (platCfg && platCfg.backend.indexOf('CUDA') < 0 && platCfg.backend.indexOf('Metal') < 0 && !isMac) {
+  // Show backend note under build step if not CUDA/Metal
+  if (isIntelMac) {
+    html += '<p class="step-note" style="margin:-0.5rem 0 1rem 2.2rem">Using <strong>CPU (Apple Accelerate)</strong> backend.</p>';
+  } else if (platCfg && platCfg.backend.indexOf('CUDA') < 0 && platCfg.backend.indexOf('Metal') < 0 && !isMac) {
     html += '<p class="step-note" style="margin:-0.5rem 0 1rem 2.2rem">Using <strong>' + platCfg.backend + '</strong> backend.</p>';
   }
 
@@ -644,7 +679,7 @@ curl -L -o ${os.modelDir}${f} ${dlUrl}</div>
   }
 
   if (model) {
-    const backendLabel = platCfg ? platCfg.backend : 'Unknown';
+    const backendLabel = isIntelMac ? 'CPU (Apple Accelerate)' : (platCfg ? platCfg.backend : 'Unknown');
     const showNvidiaCheck = platCfg && platCfg.backend.indexOf('CUDA') >= 0 && !isMac;
     html += `<li class="step">
       <div class="step-title">Run It</div>

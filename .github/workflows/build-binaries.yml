@@ -58,6 +58,12 @@ jobs:
             artifact_name: llama-server-macos-metal
             compress: tar
 
+          - os: macos-13
+            label: macos-intel
+            cmake_flags: ""
+            artifact_name: llama-server-macos-intel
+            compress: tar
+
           - os: windows-latest
             label: windows-cuda
             cmake_flags: -DGGML_CUDA=ON -DGGML_CUDA_NO_FA_ALLREDUCE=ON -DGGML_NATIVE=OFF
@@ -126,6 +132,10 @@ jobs:
           curl -sL -o build/bin/run.sh \
             https://raw.githubusercontent.com/LyndonBlack/MostlysaneAI/main/install/run.sh
           chmod +x build/bin/run.sh
+          # Also fetch run.command for macOS double-click
+          curl -sL -o build/bin/run.command \
+            https://raw.githubusercontent.com/LyndonBlack/MostlysaneAI/main/install/run.command
+          chmod +x build/bin/run.command
 
       - name: Download run.bat helper (Windows)
         if: runner.os == 'Windows'
@@ -151,7 +161,7 @@ jobs:
           cd build/bin
           echo "Files in build/bin:" && ls -la
           tar czf ../../${{ matrix.artifact_name }}.tar.gz \
-            llama-server run.sh *.dylib 2>/dev/null
+            llama-server run.sh run.command *.dylib 2>/dev/null
           echo "Packaged: $(ls -lh ../../${{ matrix.artifact_name }}.tar.gz)"
 
       - name: Package (Windows)

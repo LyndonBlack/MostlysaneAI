@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Mostlysane Local AI — Quick Start Runner
-# Run from terminal (macOS: double-click run.command instead) to:
-#   1. Download the default model if not present
-#   2. Start the server
-#   3. Open the browser
+# Mostlysane Local AI — Quick Start Runner (macOS double-click)
+# Double-click this file to open Terminal, download a model, and start the server.
 #
-# Usage:  ./run.sh [model-filename.gguf]
+# This is the macOS-friendly version of run.sh.
+# On macOS, .command files open in Terminal when double-clicked.
+#
+# Usage:  Double-click, or run from terminal:  ./run.command [model-filename.gguf]
 # Default: Qwen3.6-35B-A3B-Q5_K_M.gguf
 
 set -euo pipefail
@@ -51,7 +51,7 @@ else
   MODEL_URL="$(resolve_url "$MODEL_NAME")"
   if [ -z "$MODEL_URL" ]; then
     echo "❌  Unknown model: $MODEL_NAME"
-    echo "    Run:  ./run.sh <model-filename.gguf>"
+    echo "    Run:  ./run.command <model-filename.gguf>"
     echo "    Common: Qwen3.6-35B-A3B-Q5_K_M.gguf"
     exit 1
   fi
@@ -67,20 +67,14 @@ echo ""
 echo "🚀  Starting server..."
 echo ""
 
-# Detect platform flags
-case "$(uname -s)" in
-  Darwin*)
-    # Intel Mac: no Metal, use CPU with Accelerate framework
-    if [ "$(uname -m)" = "x86_64" ]; then
-      META_FLAGS="--no-warmup -ngl 0"
-    else
-      # Apple Silicon: use Metal (Apple GPU)
-      META_FLAGS="--no-warmup -ctk f16 -ctv f16"
-    fi
-    ;;
-  Linux*)   META_FLAGS="-ngl 99" ;;
-  *)        META_FLAGS="" ;;
-esac
+# Detect architecture for platform flags
+if [ "$(uname -m)" = "x86_64" ]; then
+  echo "📟  Intel Mac detected — CPU-only mode"
+  META_FLAGS="--no-warmup -ngl 0"
+else
+  echo "📟  Apple Silicon detected — Metal acceleration"
+  META_FLAGS="--no-warmup -ctk f16 -ctv f16"
+fi
 
 "$SERVER" -m "$MODEL_DIR/$MODEL_NAME" $META_FLAGS --host 127.0.0.1 --port 8080 &
 SERVER_PID=$!
@@ -90,10 +84,7 @@ echo "   Waiting for server to be ready..."
 for i in $(seq 1 30); do
   if curl -s -o /dev/null "http://localhost:8080/health" 2>/dev/null; then
     echo "✅  Server ready at http://localhost:8080"
-    case "$(uname -s)" in
-      Linux*)  xdg-open "http://localhost:8080" 2>/dev/null || true ;;
-      Darwin*) open "http://localhost:8080" 2>/dev/null || true ;;
-    esac
+    open "http://localhost:8080" 2>/dev/null || true
     break
   fi
   sleep 1
@@ -101,4 +92,10 @@ done
 
 echo ""
 echo "🦄  Stay Mostlysane."
+
+# Keep terminal open so user can see the server output
+echo ""
+echo "───────────────────────────────────────────────────────"
+echo "  Server is running. Press Ctrl+C to stop."
+echo "───────────────────────────────────────────────────────"
 wait $SERVER_PID
