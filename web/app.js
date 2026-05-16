@@ -479,9 +479,9 @@ function detectBrowserPlatform() {
 function getPrebuiltUrl() {
   const plat = detectBrowserPlatform();
   switch (plat) {
-    case 'mac':  return 'https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant/releases/latest/download/llama-server-macos-metal.tar.gz';
-    case 'win':  return 'https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant/releases/latest/download/llama-server-windows-cpu.zip';
-    default:     return 'https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant/releases/latest/download/llama-server-linux-cpu.tar.gz';
+    case 'mac':  return 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-macos-metal.tar.gz';
+    case 'win':  return 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-windows-cpu.zip';
+    default:     return 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-linux-cpu.tar.gz';
   }
 }
 

@@ -20,7 +20,7 @@ set -euo pipefail
 REPO_URL="https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant.git"
 REPO_BRANCH="turboternary"
 RAW_BASE="https://raw.githubusercontent.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant/${REPO_BRANCH}"
-RELEASE_BASE="https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant/releases/latest/download"
+RELEASE_BASE="https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download"
 
 BUILD_DIR="$HOME/AI/MostlysaneAI"
 MODEL_DIR="$HOME/AI/models"
