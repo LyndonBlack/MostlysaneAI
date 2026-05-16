@@ -430,6 +430,40 @@ function getVariantMinVram(model) {
   return v ? v.min_vram_mib : model.min_vram_mib;
 }
 
+// ─── Model filename → HF download URL (mirrors install.sh) ───
+function resolveDownloadUrl(file) {
+  if (file.startsWith('Ternary-Bonsai-8B-Q2_0')) {
+    return 'https://huggingface.co/prism-ml/Ternary-Bonsai-8B-gguf/resolve/main/Ternary-Bonsai-8B-Q2_0.gguf';
+  }
+  if (file.startsWith('Ternary-Bonsai-4B-Q2_0')) {
+    return 'https://huggingface.co/prism-ml/Ternary-Bonsai-4B-gguf/resolve/main/Ternary-Bonsai-4B-Q2_0.gguf';
+  }
+  // Qwen3.6: HF uses Qwen_ prefix on filename
+  if (file.startsWith('Qwen3.6-35B-A3B-')) {
+    const quant = file.replace('Qwen3.6-35B-A3B-', '');
+    return 'https://huggingface.co/bartowski/Qwen_Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen_Qwen3.6-35B-A3B-' + quant;
+  }
+  if (file.startsWith('Qwen_Qwen3-VL-')) {
+    return 'https://huggingface.co/bartowski/Qwen_Qwen3-VL-30B-A3B-Instruct-GGUF/resolve/main/' + file;
+  }
+  if (file.startsWith('mistralai_Ministral-')) {
+    return 'https://huggingface.co/bartowski/mistralai_Ministral-3-3B-Instruct-2512-GGUF/resolve/main/' + file;
+  }
+  if (file.startsWith('google_gemma-4-')) {
+    return 'https://huggingface.co/bartowski/google_gemma-4-E2B-it-GGUF/resolve/main/' + file;
+  }
+  if (file === 'llama-3.2-3b-instruct-Q4_K_M.gguf') {
+    return 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf';
+  }
+  if (file === 'microsoft_Phi-3.5-mini-instruct-Q4_K_M.gguf') {
+    return 'https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf';
+  }
+  if (file === 'Qwen2.5-1.5B-Instruct-Q8_0.gguf') {
+    return 'https://huggingface.co/bartowski/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct-Q8_0.gguf';
+  }
+  return null;
+}
+
 // ─────────────────────────────────────────────────
 //  Install guide
 // ─────────────────────────────────────────────────
@@ -499,12 +533,12 @@ function updateInstallGuide() {
 
   if (model) {
     const f = getVariantFile(model);
-    const hfUrl = `https://huggingface.co/LyndonBlack/${f.replace('.gguf', '')}`;
+    const dlUrl = resolveDownloadUrl(f) || '';
     html += `<li class="step">
       <div class="step-title">Download the Model</div>
       <div class="step-desc">Download <strong>${f}</strong> into your models directory.</div>
       <div class="command-block small">mkdir -p ${os.modelDir}
-curl -L -o ${os.modelDir}${f} ${hfUrl}</div>
+curl -L -o ${os.modelDir}${f} ${dlUrl}</div>
     </li>`;
   }
 
