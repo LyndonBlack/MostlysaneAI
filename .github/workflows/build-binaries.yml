@@ -38,7 +38,7 @@ jobs:
         include:
           - os: ubuntu-latest
             label: linux-cuda
-            cmake_flags: -DGGML_CUDA=ON
+            cmake_flags: -DGGML_CUDA=ON -DGGML_CUDA_NO_FA_ALLREDUCE=ON
             artifact_name: llama-server-linux-cuda
             compress: tar
 
@@ -56,7 +56,7 @@ jobs:
 
           - os: windows-latest
             label: windows-cuda
-            cmake_flags: -DGGML_CUDA=ON
+            cmake_flags: -DGGML_CUDA=ON -DGGML_CUDA_NO_FA_ALLREDUCE=ON
             artifact_name: llama-server-windows-cuda
             compress: zip
 
@@ -91,11 +91,6 @@ jobs:
           cuda: '12.6.0'
           # local method = full installer (includes headers + runtime)
           # sub-packages is Linux-only, doesn't work on Windows
-
-      # ── Remove allreduce.cu (multi-GPU — not needed, causes CUDA 12.3+ half ambiguity) ──
-      - name: Remove allreduce.cu (multi-GPU, not used)
-        if: matrix.label == 'linux-cuda' || matrix.label == 'windows-cuda'
-        run: rm -f ggml/src/ggml-cuda/allreduce.cu
 
       # ── Build ──
 
