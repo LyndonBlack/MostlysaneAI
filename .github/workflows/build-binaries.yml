@@ -82,7 +82,7 @@ jobs:
 
       - name: Install CUDA (Windows)
         if: matrix.label == 'windows-cuda'
-        uses: Jimver/cuda-toolkit@v0.2
+        uses: Jimver/cuda-toolkit@v0.2.35
         with:
           cuda: '12.6'
           method: 'network'
@@ -97,11 +97,14 @@ jobs:
           cmake .. ${{ matrix.cmake_flags }}
 
       - name: Build
-        env:
-          NPROC: ${{ (runner.os == 'Windows' && '') || '$(nproc)' }}
         run: |
           cd build
-          cmake --build . --config Release -j${{ env.NPROC }}
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake --build . --config Release
+          else
+            cmake --build . --config Release -j$(nproc)
+          fi
+        shell: bash
 
       # ── Package ──
 
@@ -131,13 +134,16 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $src = "build\bin\Release\"
-          $dst = "${{ matrix.artifact_name }}.zip"
-          Compress-Archive -Path "$src\llama-server.exe", "$src\llama-cli.exe", "$src\llama-entropy-calibrate.exe" -DestinationPath $dst -Force 2>$null
-          if (-not (Test-Path $dst)) {
-            Compress-Archive -Path "$src\llama-server.exe" -DestinationPath $dst -Force
+          $src = "${{ github.workspace }}\build\bin\Release\"
+          $dst = "${{ github.workspace }}\${{ matrix.artifact_name }}.zip"
+          # Collect all available binaries
+          $files = @()
+          foreach ($exe in @("llama-server.exe", "llama-cli.exe", "llama-entropy-calibrate.exe")) {
+            $p = Join-Path $src $exe
+            if (Test-Path $p) { $files += $p }
           }
-          Move-Item $dst ..\..\ -Force
+          if ($files.Count -eq 0) { $files = @((Join-Path $src "llama-server.exe")) }
+          Compress-Archive -Path $files -DestinationPath $dst -Force
 
       # ── Upload to Actions artifacts (always) ──
 
