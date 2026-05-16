@@ -90,8 +90,8 @@ jobs:
         uses: Jimver/cuda-toolkit@v0.2.35
         with:
           cuda: '12.6.0'
-          method: 'network'
-          sub-packages: '["nvcc"]'
+          # local method = full installer (includes headers + runtime)
+          # sub-packages is Linux-only, doesn't work on Windows
 
       # ── Build ──
 
