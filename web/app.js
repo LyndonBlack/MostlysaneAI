@@ -679,12 +679,12 @@ function generateSetupScript() {
     s += '# Mostlysane Local AI \u2014 All-in-One Setup' + n;
     s += '# Generated from ai.mostlysane.co.nz/getstarted' + n;
     s += 'set -euo pipefail' + n + n;
-    s += 'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"' + n;
-    s += 'SERVER="$SCRIPT_DIR/llama-server"' + n;
+    s += 'SERVER_DIR="$HOME/AI/MostlysaneAI"' + n;
+    s += 'SERVER="$SERVER_DIR/llama-server"' + n;
     s += 'MODEL="$HOME/AI/models"' + n;
     s += 'MODEL_FILE="' + fEsc + '"' + n;
     s += 'MODEL_URL="' + dlEsc + '"' + n;
-    s += 'mkdir -p "$MODEL"' + n + n;
+    s += 'mkdir -p "$SERVER_DIR" "$MODEL"' + n + n;
     if (isMac) {
       s += '# Detect Mac architecture for the right binary' + n;
       s += 'ARCH="$(uname -m)"' + n;
@@ -704,7 +704,7 @@ function generateSetupScript() {
     s += '  echo "[1/4] Downloading Mostlysane AI binary..."' + n;
     s += '  curl -L "$PREBUILT_URL" -o "/tmp/$PREBUILT_PKG"' + n;
     s += '  echo "Extracting..."' + n;
-    s += '  tar xzf "/tmp/$PREBUILT_PKG" -C "$SCRIPT_DIR"' + n;
+    s += '  tar xzf "/tmp/$PREBUILT_PKG" -C "$SERVER_DIR"' + n;
     s += '  rm "/tmp/$PREBUILT_PKG"' + n;
     s += '  chmod +x "$SERVER"' + n;
     s += 'fi' + n + n;
@@ -722,12 +722,12 @@ function generateSetupScript() {
       s += 'fi' + n;
     }
     s += n + '# Create run.sh for future use' + n;
-    s += "cat > \"$SCRIPT_DIR/run.sh\" << 'RUNEOF'" + n;
+    s += "cat > \"$SERVER_DIR/run.sh\" << 'RUNEOF'" + n;
     s += '#!/usr/bin/env bash' + n;
     s += '# Mostlysane Local AI \u2014 Run Script' + n;
     s += 'set -euo pipefail' + n;
-    s += 'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"' + n;
-    s += 'SERVER="$SCRIPT_DIR/llama-server"' + n;
+    s += 'SERVER_DIR="$HOME/AI/MostlysaneAI"' + n;
+    s += 'SERVER="$SERVER_DIR/llama-server"' + n;
     s += 'MODEL="$HOME/AI/models"' + n;
     s += 'MODEL_FILE="' + fEsc + '"' + n;
     s += 'MODEL_URL="' + dlEsc + '"' + n;
@@ -747,10 +747,34 @@ function generateSetupScript() {
     s += '(' + flagEsc + ')' + n;
     s += 'exit $?' + n;
     s += 'RUNEOF' + n;
-    s += 'chmod +x "$SCRIPT_DIR/run.sh"' + n + n;
+    s += 'chmod +x "$SERVER_DIR/run.sh"' + n + n;
+    s += '# Create desktop shortcut' + n;
+    s += 'DESKTOP="$HOME/Desktop"' + n;
+    s += 'if [ "$(uname)" = "Darwin" ]; then' + n;
+    s += '  # macOS: .command file (double-click opens Terminal)' + n;
+    s += '  SHORTCUT="$DESKTOP/MostlysaneLocalAI.command"' + n;
+    s += "  cat > \"$SHORTCUT\" << EOF" + n;
+    s += '#!/usr/bin/env bash' + n;
+    s += 'cd "$HOME/AI/MostlysaneAI"' + n;
+    s += './run.sh' + n;
+    s += 'EOF' + n;
+    s += '  chmod +x "$SHORTCUT"' + n;
+    s += 'elif [ "$(uname)" = "Linux" ]; then' + n;
+    s += '  # Linux: .desktop file' + n;
+    s += '  SHORTCUT="$DESKTOP/MostlysaneLocalAI.desktop"' + n;
+    s += "  cat > \"$SHORTCUT\" << EOF" + n;
+    s += '[Desktop Entry]' + n;
+    s += 'Type=Application' + n;
+    s += 'Name=Mostlysane Local AI' + n;
+    s += "Exec=$HOME/AI/MostlysaneAI/run.sh" + n;
+    s += 'Terminal=true' + n;
+    s += 'Categories=Utility;' + n;
+    s += 'EOF' + n;
+    s += '  chmod +x "$SHORTCUT"' + n;
+    s += 'fi' + n + n;
     s += '# [4/4] Start server' + n;
     s += 'echo "[4/4] Starting server..."' + n;
-    s += 'exec "$SCRIPT_DIR/run.sh"' + n;
+    s += 'exec "$SERVER_DIR/run.sh"' + n;
     return s;
   }
 
@@ -759,19 +783,20 @@ function generateSetupScript() {
   var bat = '@echo off' + w;
   bat += 'REM Mostlysane Local AI \u2014 All-in-One Setup' + w;
   bat += 'setlocal enabledelayedexpansion' + w + w;
+  bat += 'set SERVER_DIR=%USERPROFILE%\\AI\\MostlysaneAI' + w;
   bat += 'set MODEL_DIR=%USERPROFILE%\\AI\\models' + w;
-  bat += 'set SCRIPT_DIR=%~dp0' + w;
   bat += 'set MODEL_FILE=' + f + w;
   bat += 'set MODEL_URL=' + dlUrl + w;
-  bat += 'set SERVER=%SCRIPT_DIR%llama-server.exe' + w;
+  bat += 'set SERVER=%SERVER_DIR%\\llama-server.exe' + w;
   bat += 'set PREBUILT_URL=' + prebuiltUrl + w;
   bat += 'set PREBUILT_PKG=' + prebuiltPkg + w;
+  bat += 'if not exist "%SERVER_DIR%" mkdir "%SERVER_DIR%"' + w;
   bat += 'if not exist "%MODEL_DIR%" mkdir "%MODEL_DIR%"' + w + w;
   bat += 'REM [1/4] Download prebuilt' + w;
   bat += 'if not exist "%SERVER%" (' + w;
   bat += '    echo [1/4] Downloading Mostlysane AI binary...' + w;
   bat += '    curl -L "%PREBUILT_URL%" -o "%TEMP%\\%PREBUILT_PKG%"' + w;
-  bat += '    tar -xf "%TEMP%\\%PREBUILT_PKG%" -C "%SCRIPT_DIR%"' + w;
+  bat += '    tar -xf "%TEMP%\\%PREBUILT_PKG%" -C "%SERVER_DIR%"' + w;
   bat += '    del "%TEMP%\\%PREBUILT_PKG%"' + w;
   bat += ')' + w + w;
   bat += 'REM [2/4] Download model' + w;
@@ -787,7 +812,15 @@ function generateSetupScript() {
     bat += '    curl -sL -o "%EP%" "' + epUrl + '"' + w;
     bat += ')' + w;
   }
-  bat += w + 'REM [4/4] Start server' + w;
+  bat += w + 'REM Create desktop shortcut' + w;
+  bat += 'set SHORTCUT=%USERPROFILE%\\Desktop\\MostlysaneLocalAI.bat' + w;
+  bat += 'if not exist "%SHORTCUT%" (' + w;
+  bat += '    echo Creating desktop shortcut...' + w;
+  bat += '    echo @echo off > "%SHORTCUT%"' + w;
+  bat += '    echo cd /d "%SERVER_DIR%" >> "%SHORTCUT%"' + w;
+  bat += '    echo start "" llama-server.exe -m "%MODEL_DIR%\\%MODEL_FILE%" --alias ' + model.alias + ' --ctx-size ' + ctx + ' --host 127.0.0.1 --port 8080 >> "%SHORTCUT%"' + w;
+  bat += ')' + w + w;
+  bat += 'REM [4/4] Start server' + w;
   bat += 'echo Starting server...' + w;
   bat += 'start "" "%SERVER%" -m "%MODEL_DIR%\\%MODEL_FILE%" --alias ' + model.alias + ' --ctx-size ' + ctx + ' --host 127.0.0.1 --port 8080' + w;
   bat += 'echo Server started. Open http://localhost:8080' + w;
