@@ -660,18 +660,20 @@ function generateSetupScript() {
     fl.push('-ngl', String(model.ngl));
     if (model.cpu_moe) fl.push('--n-cpu-moe', String(cpuMoe));
     fl.push('--flash-attn', 'on');
-    if (platform === 'apple') { fl.push('--no-warmup', '-ctk', 'f16', '-ctv', 'f16'); }
-    else {
+    if (platform === 'apple') {
+      // Metal doesn't support TurboQuant cache kernels, use q8_0 K + f16 V
+      fl.push('-ctk', 'q8_0', '-ctv', 'f16');
+    } else {
       fl.push('-ctk', 'q8_0', '-ctv', 'turbo3_0');
-      if (entEnabled) fl.push('--entropy-profile', '"$MODEL/' + model.entropy_profile + '"', '--entropy-prune-ratio', '2.0');
-      if (mtpEnabled) fl.push('--spec-type', 'draft-mtp', '--spec-draft-n-max', '2');
     }
+    if (entEnabled) fl.push('--entropy-profile', '"$MODEL/' + model.entropy_profile + '"', '--entropy-prune-ratio', '2.0');
+    if (mtpEnabled) fl.push('--spec-type', 'draft-mtp', '--spec-draft-n-max', '2');
   }
   fl.push('--ctx-size', String(ctx), '--host', '127.0.0.1', '--port', '8080');
   var flagStr = fl.join(' ');
   var fEsc = esc(f), dlEsc = esc(dlUrl), flagEsc = esc(flagStr);
-  var epUrl = (entEnabled && platform !== 'apple') ? 'https://raw.githubusercontent.com/LyndonBlack/MostlysaneAI/main/web/' + model.entropy_profile : '';
-  var epFile = (entEnabled && platform !== 'apple') ? model.entropy_profile : '';
+  var epUrl = entEnabled ? 'https://raw.githubusercontent.com/LyndonBlack/MostlysaneAI/main/web/' + model.entropy_profile : '';
+  var epFile = entEnabled ? model.entropy_profile : '';
 
   if (!isWin) {
     var n = '\n', d = '$';
