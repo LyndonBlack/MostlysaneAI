@@ -759,6 +759,7 @@ function generateSetupScript() {
       s += '  curl -sL -o "$EP" "' + epUrl + '"' + n;
       s += 'fi' + n;
     }
+    s += 'export DYLD_LIBRARY_PATH="$SERVER_DIR:$DYLD_LIBRARY_PATH"' + n;
     s += 'echo "Starting server..."' + n;
     s += '(' + flagEsc + ')' + n;
     s += 'exit $?' + n;
@@ -771,6 +772,7 @@ function generateSetupScript() {
     s += '  SHORTCUT="$DESKTOP/MostlysaneLocalAI.command"' + n;
     s += "  cat > \"$SHORTCUT\" << EOF" + n;
     s += '#!/usr/bin/env bash' + n;
+    s += 'export DYLD_LIBRARY_PATH="$HOME/AI/MostlysaneAI:$DYLD_LIBRARY_PATH"' + n;
     s += 'cd "$HOME/AI/MostlysaneAI"' + n;
     s += './run.sh' + n;
     s += 'EOF' + n;
