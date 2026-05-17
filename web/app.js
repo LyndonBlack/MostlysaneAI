@@ -789,7 +789,7 @@ function renderPrebuiltDownload() {
   var isLinux = osKey.startsWith('linux');
   var osLabel = isWin ? 'Windows' : isLinux ? 'Linux' : 'macOS';
   var scriptContent = generateSetupScript();
-  var scriptName = isWin ? 'setup.bat' : osKey.startsWith('mac') ? 'setup.command' : 'setup.sh';
+  var scriptName = isWin ? 'setup.bat' : 'setup.sh';
   var blob = new Blob([scriptContent], {type:'text/plain;charset=utf-8'});
   var blobUrl = URL.createObjectURL(blob);
   area.innerHTML = '' +
@@ -806,16 +806,14 @@ function renderPrebuiltDownload() {
     } else if (isLinux) {
       instrP.textContent = 'Run in your terminal, or right-click \u2192 Properties \u2192 Permissions \u2192 Allow executing as program:';
     } else {
-      instrP.textContent = 'Double-click setup.command to run, or use the terminal:';
+      instrP.textContent = 'Double-click setup.sh to run, or use the terminal:';
     }
   }
   if (cmdBox) {
     if (isWin) {
       cmdBox.innerHTML = '<span class="tok">setup.bat</span>';
-    } else if (isLinux) {
-      cmdBox.innerHTML = '<span class="tok">chmod</span> <span class="tok">+x</span> <span class="tok">setup.sh</span> <span class="tok">&&</span> <span class="tok">./setup.sh</span>';
     } else {
-      cmdBox.innerHTML = '<span class="tok">./setup.command</span>';
+      cmdBox.innerHTML = '<span class="tok">chmod</span> <span class="tok">+x</span> <span class="tok">setup.sh</span> <span class="tok">&&</span> <span class="tok">./setup.sh</span>';
     }
     addCopyButton('prebuilt-run-cmd', cmdBox.textContent.trim());
   }
