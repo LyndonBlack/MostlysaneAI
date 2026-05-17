@@ -644,27 +644,64 @@ function renderPrebuiltDownload() {
 // ─────────────────────────────────────────────────
 //  Custom run script generator
 // ─────────────────────────────────────────────────
-// Generates a lightweight script that just sets the correct model
-// name and delegates to the static run.sh bundled with the download.
+// Produces a complete standalone run script for the user's selected
+// model. This is what gets downloaded — no delegation to static files.
 function generateCustomRunScript(plat, serverBin, modelFile, modelName) {
+  var modelDir = plat === 'win' ? '%USERPROFILE%\\AI\\models' : '$HOME/AI/models';
+  var server = plat === 'win' ? '%~dp0' + serverBin : '$SCRIPT_DIR/' + serverBin;
+  // Platform flags determined at generation time from the user's selection
+  var metaFlags = '';
+  var isArmMac = plat === 'mac-arm';
+  var isIntelMac = plat === 'mac-intel';
+  if (isIntelMac) metaFlags = '--no-warmup -ngl 0';
+  else if (isArmMac) metaFlags = '--no-warmup -ctk f16 -ctv f16';
+  else metaFlags = '-ngl 99'; // Linux or Windows
+
   if (plat === 'win') {
-    var escaped = modelName.replace(/\$/g, '$$');
     return '@echo off\n' +
-      'REM Mostlysane Local AI — Custom run script\n' +
-      'REM Generated for: ' + modelName + '\n' +
-      'REM Sets the model and delegates to run.bat\n' +
-      'setlocal enabledelayedexpansion\n' +
-      'call "%~dp0run.bat" ' + escaped + '\n' +
+      'REM Mostlysane Local AI — Custom run script for ' + modelName + '\n' +
+      'setlocal enabledelayedexpansion\n\n' +
+      'set MODEL_NAME=' + modelName + '\n' +
+      'set MODEL_DIR=' + modelDir + '\n' +
+      'set SERVER=' + server + '\n\n' +
+      'if not exist "%MODEL_DIR%" mkdir "%MODEL_DIR%"\n\n' +
+      'if exist "%MODEL_DIR%\\%MODEL_NAME%" (\n' +
+      '    echo Found: %MODEL_NAME%\n' +
+      ') else (\n' +
+      '    echo %MODEL_NAME% not found\n' +
+      '    echo Download now?\n' +
+      '    pause\n' +
+      '    curl -L --progress-bar -o "%MODEL_DIR%\\%MODEL_NAME%" ^\n' +
+      '      "DOWNLOAD_URL_PLACEHOLDER"\n' +
+      ')\n\n' +
+      'echo Starting server...\n' +
+      '"%SERVER%" -m "%MODEL_DIR%\\%MODEL_NAME%" ' + metaFlags + ' --host 127.0.0.1 --port 8080\n' +
       'pause\n';
   }
-  // Unix (macOS / Linux)
+
   return '#!/usr/bin/env bash\n' +
-    '# Mostlysane Local AI — Custom run script\n' +
-    '# Generated for: ' + modelName + '\n' +
-    '# Sets the model and delegates to run.sh in the same directory.\n' +
+    '# Mostlysane Local AI — Custom run script for ' + modelName + '\n' +
     'set -euo pipefail\n' +
-    'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n' +
-    'exec "$SCRIPT_DIR/run.sh" "' + modelName.replace(/"/g, '\"') + '"\n';
+    'MODEL_NAME="' + modelName.replace(/"/g, '\\"') + '"\n' +
+    'MODEL_DIR="' + modelDir + '"\n' +
+    'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"\n' +
+    'SERVER="' + server + '"\n' +
+    'mkdir -p "$MODEL_DIR"\n' +
+    'if [ -f "$MODEL_DIR/$MODEL_NAME" ]; then\n' +
+    '  echo "Found: $MODEL_NAME"\n' +
+    'else\n' +
+    '  echo "$MODEL_NAME not found in $MODEL_DIR"\n' +
+    '  echo "Download from: DOWNLOAD_URL_PLACEHOLDER"\n' +
+    '  read -r -p "Download now? [Y/n] " REPLY\n' +
+    '  case "$REPLY" in\n' +
+    '    n|N|no|NO) echo "Skipped."; exit 0 ;;\n' +
+    '  esac\n' +
+    '  curl -L --progress-bar -o "$MODEL_DIR/$MODEL_NAME" "DOWNLOAD_URL_PLACEHOLDER"\n' +
+    '  echo "Downloaded: $MODEL_DIR/$MODEL_NAME"\n' +
+    'fi\n' +
+    'echo "Starting server..."\n' +
+    '("$SERVER" -m "$MODEL_DIR/$MODEL_NAME" ' + metaFlags + ' --host 127.0.0.1 --port 8080)\n' +
+    'exit $?\n';
 }
 
 function downloadAsFile(btn, filename, content) {

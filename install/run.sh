@@ -1,50 +1,34 @@
 #!/usr/bin/env bash
 # Mostlysane Local AI — Quick Start Runner
 # Run from terminal (macOS: double-click run.command instead) to:
-#   1. Download the default model if not present
+#   1. Download the model (if missing)
 #   2. Start the server
 #   3. Open the browser
 #
-# Usage:  ./run.sh [model-filename.gguf]
-# Default: Qwen3.6-35B-A3B-Q5_K_M.gguf
+# Usage:  ./run.sh <model-filename.gguf>
+#   The model name MUST be provided. Use the "Custom Script" download
+#   on the Mostlysane website (ai.mostlysane.co.nz/getstarted) to get
+#   a run script tailored to your selected model.
 
 set -euo pipefail
 
+if [ $# -lt 1 ]; then
+  echo "┌─────────────────────────────────────────────────────┐"
+  echo "│  🦄 Mostlysane Local AI — Quick Start               │"
+  echo "└─────────────────────────────────────────────────────┘"
+  echo ""
+  echo "❌  No model specified."
+  echo "    Usage:  ./run.sh <model-filename.gguf>"
+  echo ""
+  echo "    Go to https://ai.mostlysane.co.nz/getstarted"
+  echo "    select your model, and download a custom run script."
+  exit 1
+fi
+
+MODEL_NAME="$1"
 MODEL_DIR="$HOME/AI/models"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SERVER="$SCRIPT_DIR/llama-server"
-
-# ─── Auto-detect model if not specified ───
-DEFAULT_MODEL="Qwen3.6-35B-A3B-Q5_K_M.gguf"
-if [ $# -ge 1 ]; then
-  MODEL_NAME="$1"
-else
-  # Check if default Qwen3.6 exists
-  if [ -f "$MODEL_DIR/$DEFAULT_MODEL" ]; then
-    MODEL_NAME="$DEFAULT_MODEL"
-  else
-    # Scan for any .gguf files, pick the largest (best quality).
-    # wc -c is portable across macOS and Linux.
-    AVAILABLE=$(find "$MODEL_DIR" -maxdepth 1 -name '*.gguf' 2>/dev/null | while read f; do
-      echo "$(wc -c < "$f") $f"
-    done | sort -rn | head -1 | sed 's/^[0-9]* //')
-    if [ -n "$AVAILABLE" ]; then
-      MODEL_NAME="$(basename "$AVAILABLE")"
-      echo "📟  No default model found. Using $MODEL_NAME"
-      echo ""
-    else
-      MODEL_NAME="$DEFAULT_MODEL"
-      echo "ℹ️  No models found in $MODEL_DIR"
-      echo "   Will download $MODEL_NAME"
-      echo ""
-    fi
-  fi
-fi
-
-echo "┌─────────────────────────────────────────────────────┐"
-echo "│  🦄 Mostlysane Local AI — Quick Start               │"
-echo "└─────────────────────────────────────────────────────┘"
-echo ""
 
 # ─── Resolve model download URL ───
 resolve_url() {
@@ -66,23 +50,33 @@ resolve_url() {
   esac
 }
 
+echo "┌─────────────────────────────────────────────────────┐"
+echo "│  🦄 Mostlysane Local AI — Quick Start               │"
+echo "└─────────────────────────────────────────────────────┘"
+echo ""
+
 # ─── Step 1: Ensure model directory ───
 mkdir -p "$MODEL_DIR"
 echo "📁  Model directory: $MODEL_DIR"
 
-# ─── Step 2: Download model if missing ───
+# ─── Step 2: Check / download model ───
 if [ -f "$MODEL_DIR/$MODEL_NAME" ]; then
   echo "✅  Model found: $MODEL_NAME ($(du -h "$MODEL_DIR/$MODEL_NAME" | cut -f1))"
 else
   MODEL_URL="$(resolve_url "$MODEL_NAME")"
   if [ -z "$MODEL_URL" ]; then
     echo "❌  Unknown model: $MODEL_NAME"
-    echo "    Run:  ./run.sh <model-filename.gguf>"
-    echo "    Common: Qwen3.6-35B-A3B-Q5_K_M.gguf"
+    echo "    Download it manually into $MODEL_DIR and re-run."
     exit 1
   fi
-  echo "📥  Downloading $MODEL_NAME..."
-  echo "    $MODEL_URL"
+  echo "📥  $MODEL_NAME not found in $MODEL_DIR"
+  echo "    URL: $MODEL_URL"
+  echo ""
+  read -r -p "   Download now? [Y/n] " REPLY
+  case "$REPLY" in
+    n|N|no|NO) echo "   Skipping download. Exiting."; exit 0 ;;
+  esac
+  echo ""
   curl -L --progress-bar -o "$MODEL_DIR/$MODEL_NAME" "$MODEL_URL"
   echo "✅  Model downloaded: $MODEL_DIR/$MODEL_NAME"
 fi
@@ -96,11 +90,9 @@ echo ""
 # Detect platform flags
 case "$(uname -s)" in
   Darwin*)
-    # Intel Mac: no Metal, use CPU with Accelerate framework
     if [ "$(uname -m)" = "x86_64" ]; then
       META_FLAGS="--no-warmup -ngl 0"
     else
-      # Apple Silicon: use Metal (Apple GPU)
       META_FLAGS="--no-warmup -ctk f16 -ctv f16"
     fi
     ;;

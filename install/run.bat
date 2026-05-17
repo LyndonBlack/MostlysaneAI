@@ -1,39 +1,33 @@
 @echo off
 REM Mostlysane Local AI — Quick Start Runner (Windows)
 REM Double-click this file to:
-REM   1. Download the default model if not present
+REM   1. Download the model (if missing)
 REM   2. Start the server
-REM   3. Open the browser
 REM
-REM Usage:  run.bat [model-filename.gguf]
-REM Default: Qwen3.6-35B-A3B-Q5_K_M.gguf
+REM Usage:  run.bat <model-filename.gguf>
+REM   The model name MUST be provided. Use the "Custom Script" download
+REM   on the Mostlysane website (ai.mostlysane.co.nz/getstarted) to get
+REM   a run script tailored to your selected model.
 
 setlocal enabledelayedexpansion
 
-set MODEL_DIR=%USERPROFILE%\AI\models
-set SERVER=%~dp0llama-server.exe
-
-REM Auto-detect model if not specified
 set MODEL_NAME=%~1
 if "%MODEL_NAME%"=="" (
-    if exist "%MODEL_DIR%\Qwen3.6-35B-A3B-Q5_K_M.gguf" (
-        set MODEL_NAME=Qwen3.6-35B-A3B-Q5_K_M.gguf
-    ) else (
-        REM Scan for any .gguf file, pick the first one found
-        set FOUND=
-        for %%f in ("%MODEL_DIR%\*.gguf") do (
-            if not defined FOUND set FOUND=%%~nxf
-        )
-        if defined FOUND (
-            set MODEL_NAME=!FOUND!
-            echo   Using model: !FOUND!
-        ) else (
-            set MODEL_NAME=Qwen3.6-35B-A3B-Q5_K_M.gguf
-            echo   No models found in %MODEL_DIR%
-            echo   Will download Qwen3.6-35B-A3B-Q5_K_M.gguf
-        )
-    )
+    echo.
+    echo --- Mostlysane Local AI -- Quick Start ---
+    echo.
+    echo ERROR: No model specified.
+    echo   Usage: run.bat model-filename.gguf
+    echo.
+    echo   Go to https://ai.mostlysane.co.nz/getstarted
+    echo   select your model, and download a custom run script.
+    echo.
+    pause
+    exit /b 1
 )
+
+set MODEL_DIR=%USERPROFILE%\AI\models
+set SERVER=%~dp0llama-server.exe
 
 echo.
 echo --- Mostlysane Local AI -- Quick Start ---
@@ -49,13 +43,15 @@ if exist "%MODEL_DIR%\%MODEL_NAME%" (
     call :resolve_url "%MODEL_NAME%"
     if errorlevel 1 (
         echo Unknown model: %MODEL_NAME%
-        echo Usage: run.bat model-filename.gguf
-        echo Common models: Qwen3.6-35B-A3B-Q5_K_M.gguf
+        echo Download it manually into %MODEL_DIR% and re-run.
         pause
         exit /b 1
     )
-    echo Downloading %MODEL_NAME% ...
+    echo %MODEL_NAME% not found in %MODEL_DIR%
     echo %MODEL_URL%
+    echo.
+    echo Download now?
+    pause
     curl -L --progress-bar -o "%MODEL_DIR%\%MODEL_NAME%" "%MODEL_URL%"
     if errorlevel 1 (
         echo Download failed.
