@@ -631,8 +631,9 @@ function generateSetupScript() {
   var isMac = osKey.startsWith('mac');
   var prebuiltUrl = '', prebuiltPkg = '';
   if (isMac) {
-    prebuiltUrl = 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-macos-metal.tar.gz';
-    prebuiltPkg = 'llama-server-macos-metal.tar.gz';
+    // Binary URL determined at runtime via uname -m in the generated script below.
+    prebuiltUrl = 'meta';
+    prebuiltPkg = 'meta';
   } else if (platform === 'nvidia') {
     prebuiltUrl = isWin ? 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-windows-cuda.zip' : 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-linux-cuda.tar.gz';
     prebuiltPkg = isWin ? 'llama-server-windows-cuda.zip' : 'llama-server-linux-cuda.tar.gz';
@@ -684,13 +685,27 @@ function generateSetupScript() {
     s += 'MODEL_FILE="' + fEsc + '"' + n;
     s += 'MODEL_URL="' + dlEsc + '"' + n;
     s += 'mkdir -p "$MODEL"' + n + n;
+    if (isMac) {
+      s += '# Detect Mac architecture for the right binary' + n;
+      s += 'ARCH="$(uname -m)"' + n;
+      s += 'if [ "$ARCH" = "arm64" ]; then' + n;
+      s += '  PREBUILT_URL="https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-macos-metal.tar.gz"' + n;
+      s += '  PREBUILT_PKG="llama-server-macos-metal.tar.gz"' + n;
+      s += 'else' + n;
+      s += '  PREBUILT_URL="https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-macos-intel.tar.gz"' + n;
+      s += '  PREBUILT_PKG="llama-server-macos-intel.tar.gz"' + n;
+      s += 'fi' + n + n;
+    } else {
+      s += 'PREBUILT_URL="' + prebuiltUrl + '"' + n;
+      s += 'PREBUILT_PKG="' + prebuiltPkg + '"' + n + n;
+    }
     s += '# [1/4] Download prebuilt binary' + n;
     s += 'if [ ! -f "$SERVER" ]; then' + n;
     s += '  echo "[1/4] Downloading Mostlysane AI binary..."' + n;
-    s += '  curl -L "' + prebuiltUrl + '" -o /tmp/' + prebuiltPkg + n;
+    s += '  curl -L "$PREBUILT_URL" -o "/tmp/$PREBUILT_PKG"' + n;
     s += '  echo "Extracting..."' + n;
-    s += '  tar xzf "/tmp/' + prebuiltPkg + '" -C "$SCRIPT_DIR"' + n;
-    s += '  rm "/tmp/' + prebuiltPkg + '"' + n;
+    s += '  tar xzf "/tmp/$PREBUILT_PKG" -C "$SCRIPT_DIR"' + n;
+    s += '  rm "/tmp/$PREBUILT_PKG"' + n;
     s += '  chmod +x "$SERVER"' + n;
     s += 'fi' + n + n;
     s += '# [2/4] Download model' + n;
@@ -812,6 +827,8 @@ function renderPrebuiltDownload() {
   if (cmdBox) {
     if (isWin) {
       cmdBox.innerHTML = '<span class="tok">setup.bat</span>';
+    } else if (isLinux) {
+      cmdBox.innerHTML = '<span class="tok">chmod</span> <span class="tok">+x</span> <span class="tok">setup.sh</span> <span class="tok">&&</span> <span class="tok">./setup.sh</span>';
     } else {
       cmdBox.innerHTML = '<span class="tok">chmod</span> <span class="tok">+x</span> <span class="tok">setup.sh</span> <span class="tok">&&</span> <span class="tok">./setup.sh</span>';
     }
