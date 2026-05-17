@@ -662,8 +662,8 @@ function generateSetupScript() {
     if (model.cpu_moe) fl.push('--n-cpu-moe', String(cpuMoe));
     fl.push('--flash-attn', 'on');
     if (platform === 'apple') {
-      // Metal doesn't support TurboQuant cache kernels, use q8_0 K + f16 V
-      fl.push('-ctk', 'q8_0', '-ctv', 'f16');
+      // Metal doesn't support TurboQuant cache kernels, use q8_0 K + q4_0 V (negligible quality loss)
+      fl.push('-ctk', 'q8_0', '-ctv', 'q4_0');
     } else {
       fl.push('-ctk', 'q8_0', '-ctv', 'turbo3_0');
     }
@@ -1533,9 +1533,16 @@ function buildCmd(model, ctx, wantVision) {
     flags.push('-ngl', String(model.ngl));
     if (model.cpu_moe) flags.push('--n-cpu-moe', String(cpuMoe));
     flags.push('--flash-attn', 'on');
-    // TurboQuant K/V and entropy: skip on Apple/Metal (Metal doesn't support TurboQuant types)
+    // TurboQuant K/V types are CUDA-only; Metal uses standard q8_0/q4_0 with entropy+MTP
     if (platform === 'apple') {
-      flags.push('--no-warmup', '-ctk', 'f16', '-ctv', 'f16');
+      // Metal: q8_0 K + q4_0 V (negligible quality impact, big context savings)
+      flags.push('-ctk', 'q8_0', '-ctv', 'q4_0');
+      if (model.entropy_profile && isEntropyEnabled()) {
+        flags.push('--entropy-profile', model.entropy_profile, '--entropy-prune-ratio', '2.0');
+      }
+      if (isMtpEnabled() && getSelectedVariant(model) && getSelectedVariant(model).mtp) {
+        flags.push('--spec-type', 'draft-mtp', '--spec-draft-n-max', '2');
+      }
     } else {
       flags.push('-ctk', 'q8_0', '-ctv', 'turbo3_0');
       if (model.entropy_profile && isEntropyEnabled()) {
