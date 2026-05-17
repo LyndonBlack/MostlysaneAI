@@ -197,6 +197,41 @@ function onEntropyToggle() {
   updateConfig();
 }
 
+function isMtpEnabled() {
+  const el = document.getElementById('mtp-toggle');
+  if (!el) return false;
+  return el.checked;
+}
+
+function onMtpToggle() {
+  updateConfig();
+}
+
+function getSelectedVariant(model) {
+  if (!model) return null;
+  return getVariant(model) || (model.variants ? model.variants[0] : null);
+}
+
+function isMtpAvailable() {
+  const model = getActiveModel();
+  const v = getSelectedVariant(model);
+  return v && v.mtp === true;
+}
+
+function updateMtpToggle() {
+  const row = document.getElementById('mtp-toggle-row');
+  if (!row) return;
+  const model = getActiveModel();
+  const v = getSelectedVariant(model);
+  if (v && v.mtp === true) {
+    row.style.display = '';
+  } else {
+    row.style.display = 'none';
+    const cb = document.getElementById('mtp-toggle');
+    if (cb) cb.checked = false;
+  }
+}
+
 // ─────────────────────────────────────────────────
 //  Effective VRAM (platform-aware)
 // ─────────────────────────────────────────────────
@@ -454,6 +489,10 @@ function resolveDownloadUrl(file) {
   if (file.startsWith('Ternary-Bonsai-4B-Q2_0')) {
     return 'https://huggingface.co/prism-ml/Ternary-Bonsai-4B-gguf/resolve/main/Ternary-Bonsai-4B-Q2_0.gguf';
   }
+  // Qwen3.6 UD (baked-in MTP): different prefix on HF
+  if (file.startsWith('Qwen3.6-35B-A3B-UD-')) {
+    return 'https://huggingface.co/bartowski/Qwen_Qwen3.6-35B-A3B-UD-Q3_K_XL-GGUF/resolve/main/Qwen_Qwen3.6-35B-A3B-UD-Q3_K_XL.gguf';
+  }
   // Qwen3.6: HF uses Qwen_ prefix on filename
   if (file.startsWith('Qwen3.6-35B-A3B-')) {
     const quant = file.replace('Qwen3.6-35B-A3B-', '');
@@ -581,129 +620,187 @@ function toggleSetupMethod(method) {
   }
 }
 
+// ─────────────────────────────────────────────────
+//  Setup script generator
+// ─────────────────────────────────────────────────
+function generateSetupScript() {
+  var osKey = document.getElementById('os').value;
+  var platform = document.getElementById('platform').value;
+  var model = getActiveModel();
+  var isWin = osKey === 'windows';
+  var isMac = osKey.startsWith('mac');
+  var prebuiltUrl = '', prebuiltPkg = '';
+  if (isMac) {
+    prebuiltUrl = 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-macos-metal.tar.gz';
+    prebuiltPkg = 'llama-server-macos-metal.tar.gz';
+  } else if (platform === 'nvidia') {
+    prebuiltUrl = isWin ? 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-windows-cuda.zip' : 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-linux-cuda.tar.gz';
+    prebuiltPkg = isWin ? 'llama-server-windows-cuda.zip' : 'llama-server-linux-cuda.tar.gz';
+  } else {
+    prebuiltUrl = isWin ? 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-windows-cpu.zip' : 'https://github.com/LyndonBlack/MostlysaneAI/releases/latest/download/llama-server-linux-cpu.tar.gz';
+    prebuiltPkg = isWin ? 'llama-server-windows-cpu.zip' : 'llama-server-linux-cpu.tar.gz';
+  }
+  if (!model) return isWin ? '@echo off\r\nerror: no model selected\r\npause' : '#!/bin/sh\necho "Error: no model selected"\nexit 1';
+  var v = getSelectedVariant(model), f = v ? v.file : model.variants[0].file;
+  var dlUrl = resolveDownloadUrl(f) || '';
+  var ctx = getContextForModel(model, getEffectiveVram());
+  var vision = document.getElementById('vision').value === '1';
+  var entEnabled = isEntropyEnabled() && model.entropy_profile;
+  var mtpEnabled = isMtpEnabled() && v && v.mtp;
+  var isApu = platform === 'apu';
+  var fl = [];
+  var esc = function(s) { return s.replace(/"/g, '\\"'); };
+  var fl_join = function(arr) { return arr.join(' '); };
+  fl.push('$SERVER', '-m', '"$MODEL/$MODEL_FILE"');
+  if (vision && model.has_vision) fl.push('--mmproj', '"$MODEL/' + model.mmproj + '"', '--no-mmproj-offload');
+  fl.push('--alias', model.alias);
+  if (!isApu) {
+    var cpuMoe = model.cpu_moe ? (ctx > model.cpu_moe_threshold ? model.cpu_moe_high : model.cpu_moe_low) : '';
+    fl.push('-ngl', String(model.ngl));
+    if (model.cpu_moe) fl.push('--n-cpu-moe', String(cpuMoe));
+    fl.push('--flash-attn', 'on');
+    if (platform === 'apple') { fl.push('--no-warmup', '-ctk', 'f16', '-ctv', 'f16'); }
+    else {
+      fl.push('-ctk', 'q8_0', '-ctv', 'turbo3_0');
+      if (entEnabled) fl.push('--entropy-profile', '"$MODEL/' + model.entropy_profile + '"', '--entropy-prune-ratio', '2.0');
+      if (mtpEnabled) fl.push('--spec-type', 'draft-mtp', '--spec-draft-n-max', '2');
+    }
+  }
+  fl.push('--ctx-size', String(ctx), '--host', '127.0.0.1', '--port', '8080');
+  var flagStr = fl.join(' ');
+  var fEsc = esc(f), dlEsc = esc(dlUrl), flagEsc = esc(flagStr);
+  var epUrl = (entEnabled && platform !== 'apple') ? 'https://raw.githubusercontent.com/LyndonBlack/MostlysaneAI/main/web/' + model.entropy_profile : '';
+  var epFile = (entEnabled && platform !== 'apple') ? model.entropy_profile : '';
+
+  if (!isWin) {
+    var n = '\n', d = '$';
+    var s = '#!/usr/bin/env bash' + n;
+    s += '# Mostlysane Local AI \u2014 All-in-One Setup' + n;
+    s += '# Generated from ai.mostlysane.co.nz/getstarted' + n;
+    s += 'set -euo pipefail' + n + n;
+    s += 'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"' + n;
+    s += 'SERVER="$SCRIPT_DIR/llama-server"' + n;
+    s += 'MODEL="$HOME/AI/models"' + n;
+    s += 'MODEL_FILE="' + fEsc + '"' + n;
+    s += 'MODEL_URL="' + dlEsc + '"' + n;
+    s += 'mkdir -p "$MODEL"' + n + n;
+    s += '# [1/4] Download prebuilt binary' + n;
+    s += 'if [ ! -f "$SERVER" ]; then' + n;
+    s += '  echo "[1/4] Downloading Mostlysane AI binary..."' + n;
+    s += '  curl -L "' + prebuiltUrl + '" -o /tmp/' + prebuiltPkg + n;
+    s += '  echo "Extracting..."' + n;
+    s += '  tar xzf "/tmp/' + prebuiltPkg + '" -C "$SCRIPT_DIR"' + n;
+    s += '  rm "/tmp/' + prebuiltPkg + '"' + n;
+    s += '  chmod +x "$SERVER"' + n;
+    s += 'fi' + n + n;
+    s += '# [2/4] Download model' + n;
+    s += 'if [ ! -f "$MODEL/$MODEL_FILE" ]; then' + n;
+    s += '  echo "[2/4] Downloading model..."' + n;
+    s += '  curl -L "$MODEL_URL" -o "$MODEL/$MODEL_FILE"' + n;
+    s += 'fi' + n;
+    if (epUrl) {
+      s += n + '# [3/4] Download entropy profile' + n;
+      s += 'EP="$MODEL/' + epFile + '"' + n;
+      s += 'if [ ! -f "$EP" ]; then' + n;
+      s += '  echo "[3/4] Downloading entropy profile..."' + n;
+      s += '  curl -sL -o "$EP" "' + epUrl + '"' + n;
+      s += 'fi' + n;
+    }
+    s += n + '# Create run.sh for future use' + n;
+    s += "cat > \"$SCRIPT_DIR/run.sh\" << 'RUNEOF'" + n;
+    s += '#!/usr/bin/env bash' + n;
+    s += '# Mostlysane Local AI \u2014 Run Script' + n;
+    s += 'set -euo pipefail' + n;
+    s += 'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"' + n;
+    s += 'SERVER="$SCRIPT_DIR/llama-server"' + n;
+    s += 'MODEL="$HOME/AI/models"' + n;
+    s += 'MODEL_FILE="' + fEsc + '"' + n;
+    s += 'MODEL_URL="' + dlEsc + '"' + n;
+    s += 'mkdir -p "$MODEL"' + n;
+    s += 'if [ ! -f "$MODEL/$MODEL_FILE" ]; then' + n;
+    s += '  echo "Downloading model..."' + n;
+    s += '  curl -L "$MODEL_URL" -o "$MODEL/$MODEL_FILE"' + n;
+    s += 'fi' + n;
+    if (epUrl) {
+      s += 'EP="$MODEL/' + epFile + '"' + n;
+      s += 'if [ ! -f "$EP" ]; then' + n;
+      s += '  echo "Downloading entropy profile..."' + n;
+      s += '  curl -sL -o "$EP" "' + epUrl + '"' + n;
+      s += 'fi' + n;
+    }
+    s += 'echo "Starting server..."' + n;
+    s += '(' + flagEsc + ')' + n;
+    s += 'exit $?' + n;
+    s += 'RUNEOF' + n;
+    s += 'chmod +x "$SCRIPT_DIR/run.sh"' + n + n;
+    s += '# [4/4] Start server' + n;
+    s += 'echo "[4/4] Starting server..."' + n;
+    s += 'exec "$SCRIPT_DIR/run.sh"' + n;
+    return s;
+  }
+
+  // Windows .bat
+  var w = '\r\n';
+  var bat = '@echo off' + w;
+  bat += 'REM Mostlysane Local AI \u2014 All-in-One Setup' + w;
+  bat += 'setlocal enabledelayedexpansion' + w + w;
+  bat += 'set MODEL_DIR=%USERPROFILE%\\AI\\models' + w;
+  bat += 'set SCRIPT_DIR=%~dp0' + w;
+  bat += 'set MODEL_FILE=' + f + w;
+  bat += 'set MODEL_URL=' + dlUrl + w;
+  bat += 'set SERVER=%SCRIPT_DIR%llama-server.exe' + w;
+  bat += 'set PREBUILT_URL=' + prebuiltUrl + w;
+  bat += 'set PREBUILT_PKG=' + prebuiltPkg + w;
+  bat += 'if not exist "%MODEL_DIR%" mkdir "%MODEL_DIR%"' + w + w;
+  bat += 'REM [1/4] Download prebuilt' + w;
+  bat += 'if not exist "%SERVER%" (' + w;
+  bat += '    echo [1/4] Downloading Mostlysane AI binary...' + w;
+  bat += '    curl -L "%PREBUILT_URL%" -o "%TEMP%\\%PREBUILT_PKG%"' + w;
+  bat += '    tar -xf "%TEMP%\\%PREBUILT_PKG%" -C "%SCRIPT_DIR%"' + w;
+  bat += '    del "%TEMP%\\%PREBUILT_PKG%"' + w;
+  bat += ')' + w + w;
+  bat += 'REM [2/4] Download model' + w;
+  bat += 'if not exist "%MODEL_DIR%\\%MODEL_FILE%" (' + w;
+  bat += '    echo [2/4] Downloading model...' + w;
+  bat += '    curl -L "%MODEL_URL%" -o "%MODEL_DIR%\\%MODEL_FILE%"' + w;
+  bat += ')' + w;
+  if (epUrl) {
+    bat += w + 'REM [3/4] Download entropy profile' + w;
+    bat += 'set EP=%MODEL_DIR%\\' + epFile + w;
+    bat += 'if not exist "%EP%" (' + w;
+    bat += '    echo [3/4] Downloading profile...' + w;
+    bat += '    curl -sL -o "%EP%" "' + epUrl + '"' + w;
+    bat += ')' + w;
+  }
+  bat += w + 'REM [4/4] Start server' + w;
+  bat += 'echo Starting server...' + w;
+  bat += 'start "" "%SERVER%" -m "%MODEL_DIR%\\%MODEL_FILE%" --alias ' + model.alias + ' --ctx-size ' + ctx + ' --host 127.0.0.1 --port 8080' + w;
+  bat += 'echo Server started. Open http://localhost:8080' + w;
+  bat += 'pause' + w;
+  return bat;
+}
+
 // Render the prebuilt download area
 function renderPrebuiltDownload() {
   var area = document.getElementById('prebuilt-download-area');
   if (!area) return;
-
-  var url = getPrebuiltUrl();
-  var fname = getPrebuiltFilename();
-  var plat = getPlatformLabel();
-  var serverBin = getServerBinaryName();
-
-  // Get the user's selected model for custom run script
-  var selectedModel = getActiveModel();
-  var modelFile = selectedModel ? getVariantFile(selectedModel) : '';
-
+  var osKey = document.getElementById('os').value;
+  var isWin = osKey === 'windows';
+  var osLabel = isWin ? 'Windows' : osKey.startsWith('mac') ? 'macOS' : 'Linux';
+  var scriptContent = generateSetupScript();
+  var scriptName = isWin ? 'setup.bat' : 'setup.sh';
+  var blob = new Blob([scriptContent], {type:'text/plain;charset=utf-8'});
+  var blobUrl = URL.createObjectURL(blob);
   area.innerHTML = '' +
-    '<a href="' + url + '" download style="display:inline-block;padding:0.65rem 1.5rem;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;font-size:1rem;text-decoration:none;margin-bottom:0.75rem">' +
-    '⬇  Download for ' + plat +
+    '<a href="' + blobUrl + '" download="' + scriptName + '" style="display:inline-block;padding:0.65rem 1.5rem;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;font-size:1rem;text-decoration:none;margin-bottom:0.5rem" onclick="setTimeout(function(){URL.revokeObjectURL(\'' + blobUrl + '\')},1000)">' +
+    '\u2b07  Download setup.' + (isWin ? 'bat' : 'sh') + ' for ' + osLabel +
     '</a>' +
-    '<p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:0.5rem">' +
-    'Binary: <code>' + fname + '</code> (~50-80 MB)' +
+    '<p style="color:var(--text-muted);font-size:0.85rem">' +
+    (osKey.startsWith('linux')
+      ? 'Run <strong>chmod +x setup.sh && ./setup.sh</strong> in your terminal. Downloads the binary, your model, and starts the server. Future runs: just double-click <strong>run.sh</strong> in the same folder.'
+      : 'Double-click <strong>setup.' + (isWin ? 'bat' : 'sh') + '</strong> to download the prebuilt binary and start the server. Future runs: just double-click <strong>run.' + (isWin ? 'bat' : 'sh') + '</strong> in the same folder.') +
     '</p>';
-
-  // Set the run command — model-specific when a model is selected
-  var plat = detectBrowserPlatform();
-  var isWin = plat === 'win';
-  var isMac = plat === 'mac-arm' || plat === 'mac-intel';
-  var cmdBlock = document.getElementById('prebuilt-run-cmd');
-  if (cmdBlock) {
-    if (modelFile) {
-      // Show the exact command with the user's model
-      var runner = isMac ? 'run.command' : isWin ? 'run.bat' : 'run.sh';
-      cmdBlock.innerHTML = 'Extract the .tar.gz, then run:<br>' +
-        '<strong style="font-size:0.95rem">./' + runner + ' ' + modelFile + '</strong>' +
-        '<br><span style="font-size:0.8rem;color:var(--text-muted)">(or double-click ' + runner + ' to auto-detect a model in your models folder)</span>';
-    } else {
-      if (isMac) {
-        cmdBlock.innerHTML = 'Extract the .tar.gz, then <strong>double-click run.command</strong>';
-      } else if (isWin) {
-        cmdBlock.innerHTML = 'Extract the zip, then <strong>double-click run.bat</strong>';
-      } else {
-        cmdBlock.innerHTML = 'Extract the .tar.gz, then <strong>./run.sh</strong>';
-      }
-    }
-  }
-
-  // Generate a downloadable custom run script with the model baked in
-  var scriptBlock = document.getElementById('custom-run-script');
-  if (scriptBlock) {
-    if (modelFile) {
-      scriptBlock.style.display = '';
-      var filename = isWin ? 'run.bat' : 'run.sh';
-      var content = generateCustomRunScript(plat, serverBin, modelFile, modelFile);
-      var dlBtn = scriptBlock.querySelector('.custom-run-dl-btn');
-      downloadAsFile(dlBtn, filename, content);
-    } else {
-      scriptBlock.style.display = 'none';
-    }
-  }
 }
-
-// ─────────────────────────────────────────────────
-//  Custom run script generator
-// ─────────────────────────────────────────────────
-// Produces a complete standalone run script for the user's selected
-// model. This is what gets downloaded — no delegation to static files.
-function generateCustomRunScript(plat, serverBin, modelFile, modelName) {
-  var modelDir = plat === 'win' ? '%USERPROFILE%\\AI\\models' : '$HOME/AI/models';
-  var server = plat === 'win' ? '%~dp0' + serverBin : '$SCRIPT_DIR/' + serverBin;
-  // Platform flags determined at generation time from the user's selection
-  var metaFlags = '';
-  var isArmMac = plat === 'mac-arm';
-  var isIntelMac = plat === 'mac-intel';
-  if (isIntelMac) metaFlags = '--no-warmup -ngl 0';
-  else if (isArmMac) metaFlags = '--no-warmup -ctk f16 -ctv f16';
-  else metaFlags = '-ngl 99'; // Linux or Windows
-
-  if (plat === 'win') {
-    return '@echo off\n' +
-      'REM Mostlysane Local AI — Custom run script for ' + modelName + '\n' +
-      'setlocal enabledelayedexpansion\n\n' +
-      'set MODEL_NAME=' + modelName + '\n' +
-      'set MODEL_DIR=' + modelDir + '\n' +
-      'set SERVER=' + server + '\n\n' +
-      'if not exist "%MODEL_DIR%" mkdir "%MODEL_DIR%"\n\n' +
-      'if exist "%MODEL_DIR%\\%MODEL_NAME%" (\n' +
-      '    echo Found: %MODEL_NAME%\n' +
-      ') else (\n' +
-      '    echo %MODEL_NAME% not found\n' +
-      '    echo Download now?\n' +
-      '    pause\n' +
-      '    curl -L --progress-bar -o "%MODEL_DIR%\\%MODEL_NAME%" ^\n' +
-      '      "DOWNLOAD_URL_PLACEHOLDER"\n' +
-      ')\n\n' +
-      'echo Starting server...\n' +
-      '"%SERVER%" -m "%MODEL_DIR%\\%MODEL_NAME%" ' + metaFlags + ' --host 127.0.0.1 --port 8080\n' +
-      'pause\n';
-  }
-
-  return '#!/usr/bin/env bash\n' +
-    '# Mostlysane Local AI — Custom run script for ' + modelName + '\n' +
-    'set -euo pipefail\n' +
-    'MODEL_NAME="' + modelName.replace(/"/g, '\\"') + '"\n' +
-    'MODEL_DIR="' + modelDir + '"\n' +
-    'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"\n' +
-    'SERVER="' + server + '"\n' +
-    'mkdir -p "$MODEL_DIR"\n' +
-    'if [ -f "$MODEL_DIR/$MODEL_NAME" ]; then\n' +
-    '  echo "Found: $MODEL_NAME"\n' +
-    'else\n' +
-    '  echo "$MODEL_NAME not found in $MODEL_DIR"\n' +
-    '  echo "Download from: DOWNLOAD_URL_PLACEHOLDER"\n' +
-    '  read -r -p "Download now? [Y/n] " REPLY\n' +
-    '  case "$REPLY" in\n' +
-    '    n|N|no|NO) echo "Skipped."; exit 0 ;;\n' +
-    '  esac\n' +
-    '  curl -L --progress-bar -o "$MODEL_DIR/$MODEL_NAME" "DOWNLOAD_URL_PLACEHOLDER"\n' +
-    '  echo "Downloaded: $MODEL_DIR/$MODEL_NAME"\n' +
-    'fi\n' +
-    'echo "Starting server..."\n' +
-    '("$SERVER" -m "$MODEL_DIR/$MODEL_NAME" ' + metaFlags + ' --host 127.0.0.1 --port 8080)\n' +
-    'exit $?\n';
-}
-
 function downloadAsFile(btn, filename, content) {
   if (!btn) return;
   btn.onclick = function(e) {
@@ -910,12 +1007,17 @@ function estimateVram(model, ctx, wantVision, wantEntropy) {
   const kvWithEntropy = kvRaw * (1 - mem.entropy_savings_pct / 100);
   const mmprojMib = (wantVision && model.has_vision) ? mem.vision_mmproj_mib : 0;
 
+  const mtpOverhead = (isMtpEnabled() && getSelectedVariant(model) && getSelectedVariant(model).mtp)
+    ? getSelectedVariant(model).mtp_overhead_mib || 900
+    : 0;
+
   return {
-    total: gpuWeights + kvWithEntropy + mmprojMib + mem.overhead_mib,
+    total: gpuWeights + kvWithEntropy + mmprojMib + mem.overhead_mib + mtpOverhead,
     weights: gpuWeights,
     kvCache: kvWithEntropy,
     mmproj: mmprojMib,
     overhead: mem.overhead_mib,
+    mtpOverhead: mtpOverhead,
     ramWeights: ramWeights,
     entropyPct: mem.entropy_savings_pct
   };
@@ -964,8 +1066,9 @@ function buildModelCard(model, vramMib, vision, selected) {
   const currentQuant = getVariant(model);
   let quantHtml = '';
   if (model.variants && model.variants.length > 1) {
+    const quantName = currentQuant ? currentQuant.quant : model.variants[0].quant;
     quantHtml = `<span class="model-option-quant" id="quant-${model.id}" onclick="event.stopPropagation();toggleQuantMenu('${model.id}')">
-      Specific Variant ▾
+      ${quantName} ▾
     </span>`;
   } else if (model.variants && model.variants.length === 1) {
     quantHtml = `<span class="model-option-quant-static">Variant: ${model.variants[0].quant}</span>`;
@@ -1070,10 +1173,19 @@ function selectVariant(modelId, quant) {
   SELECTED_VARIANTS[modelId] = quant;
   closeQuantMenu();
   if (modelId === SELECTED_MODEL_ID) {
+    // Auto-enable MTP toggle when selecting an MTP variant
+    const model = MODELS.find(m => m.id === modelId);
+    const v = model ? model.variants.find(x => x.quant === quant) : null;
+    if (v && v.mtp === true) {
+      const cb = document.getElementById('mtp-toggle');
+      if (cb) cb.checked = true;
+    }
     renderModelSelector();
+    updateMtpToggle();
     renderMemoryBreakdown();
     updateCommand();
     updateInstallGuide();
+    renderPrebuiltDownload();
   } else {
     // Re-render panel options too
     if (modelPanelOpen) {
@@ -1145,6 +1257,7 @@ function selectModel(modelId) {
   renderMemoryBreakdown();
   updateCommand();
   updateInstallGuide();
+  renderPrebuiltDownload();
 }
 
 // ─────────────────────────────────────────────────
@@ -1262,6 +1375,7 @@ function renderMemoryBreakdown() {
     { label: 'KV cache', mib: est.kvCache, color: '#3fb950' },
     { label: 'Overhead / buffers', mib: est.overhead, color: '#d29922' }
   ];
+  if (est.mtpOverhead && est.mtpOverhead > 0) segments.push({ label: 'MTP Fast Gen (spec context + head)', mib: est.mtpOverhead, color: '#bc8cff' });
   if (est.mmproj > 0) segments.push({ label: 'Vision encoder', mib: est.mmproj, color: '#f0883e' });
   if (systemOverhead > 10) segments.push({ label: 'GPU system reservation', mib: systemOverhead, color: '#7a3b8e' });
   if (freeVram > 10 && rawVram > 0) segments.push({ label: 'Free VRAM', mib: Math.max(0, freeVram), color: '#30363d' });
@@ -1296,8 +1410,11 @@ function renderMemoryBreakdown() {
     : model.entropy_profile
       ? `<p class="mem-note">📉 Entropy Path B available but <strong>disabled</strong>. Enable it for ~30% less KV cache.</p>`
       : '';
+  const mtpNote = (isMtpEnabled() && est.mtpOverhead > 0)
+    ? `<p class="mem-note">🚀 MTP Fast Generation active — adds ~${Math.round(est.mtpOverhead).toLocaleString()} MiB VRAM overhead for spec context + head.</p>`
+    : '';
 
-  document.getElementById('memory-usage').innerHTML = barHtml + tableHtml + ramHtml + modelNote + note;
+  document.getElementById('memory-usage').innerHTML = barHtml + tableHtml + ramHtml + modelNote + note + mtpNote;
 }
 
 // ─────────────────────────────────────────────────
@@ -1333,6 +1450,9 @@ function buildCmd(model, ctx, wantVision) {
       flags.push('-ctk', 'q8_0', '-ctv', 'turbo3_0');
       if (model.entropy_profile && isEntropyEnabled()) {
         flags.push('--entropy-profile', model.entropy_profile, '--entropy-prune-ratio', '2.0');
+      }
+      if (isMtpEnabled() && getSelectedVariant(model) && getSelectedVariant(model).mtp) {
+        flags.push('--spec-type', 'draft-mtp', '--spec-draft-n-max', '2');
       }
     }
   }
@@ -1424,6 +1544,10 @@ function updateCommand() {
       // Always show comparison link for any model
       html += ' <a href="#" onclick="openCompare();return false" style="font-size:0.85rem">See model comparison →</a></p>';
     }
+    const activeV = getSelectedVariant(model);
+    if (activeV && activeV.notes) {
+      html += '<p style="margin-top:0.4rem;font-size:0.85rem;color:var(--accent)">✨ <strong>' + activeV.quant + ':</strong> ' + activeV.notes + '</p>';
+    }
     // Add --no-mmap tip for MoE models on systems with enough RAM
     var ram = parseInt(document.getElementById('ram').value);
     if (model.cpu_moe && ram >= 32) {
@@ -1435,7 +1559,6 @@ function updateCommand() {
 }
 
 function updateConfig() {
-  renderPrebuiltDownload();
   const ram = parseInt(document.getElementById('ram').value);
   const vision = document.getElementById('vision').value === '1';
   const viable = getViableModels(getEffectiveVram(), ram, vision);
@@ -1451,10 +1574,12 @@ function updateConfig() {
 
   document.getElementById('recommendation').classList.remove('hidden');
   renderModelSelector();
+  updateMtpToggle();
   renderMemoryBreakdown();
   updateCommand();
   updateInstallGuide();
   setUsageTierDesc();
+  renderPrebuiltDownload();
 }
 
 // ─────────────────────────────────────────────────

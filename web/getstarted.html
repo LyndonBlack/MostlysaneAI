@@ -111,6 +111,11 @@ nav .links a.active { color: var(--accent); }
         <span class="entropy-toggle-switch"></span>
         <span><strong>Entropy Smart Cache</strong> — saves ~30% KV memory</span>
       </label>
+      <label class="entropy-toggle-label" id="mtp-toggle-row" style="display:none">
+        <input type="checkbox" id="mtp-toggle" onchange="onMtpToggle()">
+        <span class="entropy-toggle-switch"></span>
+        <span><strong>🚀 MTP Fast Generation</strong> — up to +33% speed on code</span>
+      </label>
       <button class="model-switch-btn" id="model-dropdown-btn" onclick="toggleModelPanel()" title="Switch model">
         Switch Model <span class="chevron" id="model-chevron">▾</span>
       </button>

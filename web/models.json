@@ -51,6 +51,19 @@
         "min_vram_mib": 7500,
         "kv_per_100k_mib": 550,
         "overhead_mib": 600
+      },
+      {
+        "quant": "Q3_K_XL (MTP)",
+        "file": "Qwen3.6-35B-A3B-UD-Q3_K_XL.gguf",
+        "file_gb": 17,
+        "gpu_weights_mib": 3600,
+        "ram_weights_mib": 13400,
+        "min_vram_mib": 6500,
+        "kv_per_100k_mib": 550,
+        "overhead_mib": 600,
+        "mtp": true,
+        "mtp_overhead_mib": 900,
+        "notes": "Baked-in MTP head for faster generation (~33% speedup on code). Uses same book entropy profile. Q3_K_XL preserves critical layers at higher precision."
       }
     ]
   },
