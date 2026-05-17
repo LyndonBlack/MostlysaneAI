@@ -652,6 +652,7 @@ function generateSetupScript() {
   var fl = [];
   var esc = function(s) { return s.replace(/"/g, '\\"'); };
   var fl_join = function(arr) { return arr.join(' '); };
+  // Shell variables expanded at runtime — quote them properly for bash
   fl.push('$SERVER', '-m', '"$MODEL/$MODEL_FILE"');
   if (vision && model.has_vision) fl.push('--mmproj', '"$MODEL/' + model.mmproj + '"', '--no-mmproj-offload');
   fl.push('--alias', model.alias);
@@ -671,7 +672,9 @@ function generateSetupScript() {
   }
   fl.push('--ctx-size', String(ctx), '--host', '127.0.0.1', '--port', '8080');
   var flagStr = fl.join(' ');
-  var fEsc = esc(f), dlEsc = esc(dlUrl), flagEsc = esc(flagStr);
+  var fEsc = esc(f), dlEsc = esc(dlUrl);
+  // Flags go into single-quoted heredoc — don't escape quotes, bash needs them as delimiters
+  var flagEsc = flagStr;
   var epUrl = entEnabled ? 'https://raw.githubusercontent.com/LyndonBlack/MostlysaneAI/main/web/' + model.entropy_profile : '';
   var epFile = entEnabled ? model.entropy_profile : '';
 
