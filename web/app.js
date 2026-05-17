@@ -786,20 +786,39 @@ function renderPrebuiltDownload() {
   if (!area) return;
   var osKey = document.getElementById('os').value;
   var isWin = osKey === 'windows';
-  var osLabel = isWin ? 'Windows' : osKey.startsWith('mac') ? 'macOS' : 'Linux';
+  var isLinux = osKey.startsWith('linux');
+  var osLabel = isWin ? 'Windows' : isLinux ? 'Linux' : 'macOS';
   var scriptContent = generateSetupScript();
   var scriptName = isWin ? 'setup.bat' : 'setup.sh';
   var blob = new Blob([scriptContent], {type:'text/plain;charset=utf-8'});
   var blobUrl = URL.createObjectURL(blob);
   area.innerHTML = '' +
-    '<a href="' + blobUrl + '" download="' + scriptName + '" style="display:inline-block;padding:0.65rem 1.5rem;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;font-size:1rem;text-decoration:none;margin-bottom:0.5rem" onclick="setTimeout(function(){URL.revokeObjectURL(\'' + blobUrl + '\')},1000)">' +
+    '<a href="' + blobUrl + '" download="' + scriptName + '" style="display:inline-block;padding:0.65rem 1.5rem;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;font-size:1rem;text-decoration:none;margin-bottom:0" onclick="setTimeout(function(){URL.revokeObjectURL(\'' + blobUrl + '\')},1000)">' +
     '\u2b07  Download setup.' + (isWin ? 'bat' : 'sh') + ' for ' + osLabel +
-    '</a>' +
-    '<p style="color:var(--text-muted);font-size:0.85rem">' +
-    (osKey.startsWith('linux')
-      ? 'Run <strong>chmod +x setup.sh && ./setup.sh</strong> in your terminal. Downloads the binary, your model, and starts the server. Future runs: just double-click <strong>run.sh</strong> in the same folder.'
-      : 'Double-click <strong>setup.' + (isWin ? 'bat' : 'sh') + '</strong> to download the prebuilt binary and start the server. Future runs: just double-click <strong>run.' + (isWin ? 'bat' : 'sh') + '</strong> in the same folder.') +
-    '</p>';
+    '</a>';
+
+  // Fill the instructions box
+  var instrP = document.querySelector('#prebuilt-instructions p');
+  var cmdBox = document.getElementById('prebuilt-run-cmd');
+  if (instrP) {
+    if (isWin) {
+      instrP.textContent = 'Double-click setup.bat, or run from terminal:';
+    } else if (isLinux) {
+      instrP.textContent = 'Run in your terminal, or right-click \u2192 Properties \u2192 Permissions \u2192 Allow executing as program:';
+    } else {
+      instrP.textContent = 'Double-click setup.sh to run, or use the terminal:';
+    }
+  }
+  if (cmdBox) {
+    if (isWin) {
+      cmdBox.innerHTML = '<span class="tok">setup.bat</span>';
+    } else if (isLinux) {
+      cmdBox.innerHTML = '<span class="tok">chmod</span> <span class="tok">+x</span> <span class="tok">setup.sh</span> <span class="tok">&&</span> <span class="tok">./setup.sh</span>';
+    } else {
+      cmdBox.innerHTML = '<span class="tok">chmod</span> <span class="tok">+x</span> <span class="tok">setup.sh</span> <span class="tok">&&</span> <span class="tok">./setup.sh</span>';
+    }
+    addCopyButton('prebuilt-run-cmd', cmdBox.textContent.trim());
+  }
 }
 function downloadAsFile(btn, filename, content) {
   if (!btn) return;
