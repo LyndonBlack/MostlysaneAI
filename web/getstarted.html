@@ -79,7 +79,7 @@ nav .links a.active { color: var(--accent); }
   </select>
 
   <label for="os">Operating System <span id="os-detected" style="font-weight:normal;color:#8b949e;font-size:0.85rem"></span></label>
-  <select id="os" onchange="updateConfig()">
+  <select id="os" onchange="onOsChange()">
     <option value="linux-ubuntu">🐧 Linux (Ubuntu / Debian)</option>
     <option value="linux-fedora">🐧 Linux (Fedora / RHEL)</option>
     <option value="linux-arch">🐧 Linux (Arch)</option>
@@ -155,6 +155,11 @@ nav .links a.active { color: var(--accent); }
           Extract the zip, then run the helper script:
         </p>
         <div class="command-block small" id="prebuilt-run-cmd" style="margin-top:0.35rem"></div>
+      </div>
+      <div id="custom-run-script" style="background:var(--bg-card);border-radius:8px;padding:0.5rem 0.75rem;border:1px solid var(--accent);margin-bottom:0.5rem;display:none">
+        <span style="color:var(--accent);font-size:0.85rem">✨ Custom script</span>
+        <span style="color:var(--text-muted);font-size:0.8rem"> — replaces the default run.sh with one that uses your selected model:</span>
+        <a href="#" class="custom-run-dl-btn" style="display:inline-block;padding:0.35rem 0.75rem;border-radius:5px;background:var(--accent);color:#fff;font-size:0.8rem;font-weight:600;text-decoration:none;margin-left:0.5rem">📋 Download</a>
       </div>
       <p style="color:var(--text-muted);font-size:0.85rem">
         Prefer building from source? Switch to "Build from Source" above.

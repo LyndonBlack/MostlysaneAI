@@ -10,11 +10,30 @@ REM Default: Qwen3.6-35B-A3B-Q5_K_M.gguf
 
 setlocal enabledelayedexpansion
 
-set MODEL_NAME=%~1
-if "%MODEL_NAME%"=="" set MODEL_NAME=Qwen3.6-35B-A3B-Q5_K_M.gguf
-
 set MODEL_DIR=%USERPROFILE%\AI\models
 set SERVER=%~dp0llama-server.exe
+
+REM Auto-detect model if not specified
+set MODEL_NAME=%~1
+if "%MODEL_NAME%"=="" (
+    if exist "%MODEL_DIR%\Qwen3.6-35B-A3B-Q5_K_M.gguf" (
+        set MODEL_NAME=Qwen3.6-35B-A3B-Q5_K_M.gguf
+    ) else (
+        REM Scan for any .gguf file, pick the first one found
+        set FOUND=
+        for %%f in ("%MODEL_DIR%\*.gguf") do (
+            if not defined FOUND set FOUND=%%~nxf
+        )
+        if defined FOUND (
+            set MODEL_NAME=!FOUND!
+            echo   Using model: !FOUND!
+        ) else (
+            set MODEL_NAME=Qwen3.6-35B-A3B-Q5_K_M.gguf
+            echo   No models found in %MODEL_DIR%
+            echo   Will download Qwen3.6-35B-A3B-Q5_K_M.gguf
+        )
+    )
+)
 
 echo.
 echo --- Mostlysane Local AI -- Quick Start ---

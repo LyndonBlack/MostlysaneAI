@@ -10,10 +10,35 @@
 
 set -euo pipefail
 
-MODEL_NAME="${1:-Qwen3.6-35B-A3B-Q5_K_M.gguf}"
 MODEL_DIR="$HOME/AI/models"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SERVER="$SCRIPT_DIR/llama-server"
+
+# ─── Auto-detect model if not specified ───
+DEFAULT_MODEL="Qwen3.6-35B-A3B-Q5_K_M.gguf"
+if [ $# -ge 1 ]; then
+  MODEL_NAME="$1"
+else
+  # Check if default Qwen3.6 exists
+  if [ -f "$MODEL_DIR/$DEFAULT_MODEL" ]; then
+    MODEL_NAME="$DEFAULT_MODEL"
+  else
+    # Scan for any .gguf files, pick the largest (best quality)
+    AVAILABLE=$(find "$MODEL_DIR" -maxdepth 1 -name '*.gguf' 2>/dev/null | while read f; do
+      echo "$(wc -c < "$f") $f"
+    done | sort -rn | head -1 | sed 's/^[0-9]* //')
+    if [ -n "$AVAILABLE" ]; then
+      MODEL_NAME="$(basename "$AVAILABLE")"
+      echo "📟  No default model found. Using $(basename "$AVAILABLE")"
+      echo ""
+    else
+      MODEL_NAME="$DEFAULT_MODEL"
+      echo "ℹ️  No models found in $MODEL_DIR"
+      echo "   Will download $MODEL_NAME"
+      echo ""
+    fi
+  fi
+fi
 
 echo "┌─────────────────────────────────────────────────────┐"
 echo "│  🦄 Mostlysane Local AI — Quick Start               │"
@@ -76,26 +101,26 @@ else
   META_FLAGS="--no-warmup -ctk f16 -ctv f16"
 fi
 
-"$SERVER" -m "$MODEL_DIR/$MODEL_NAME" $META_FLAGS --host 127.0.0.1 --port 8080 &
-SERVER_PID=$!
-
-# ─── Step 4: Wait for health, open browser ───
-echo "   Waiting for server to be ready..."
-for i in $(seq 1 30); do
-  if curl -s -o /dev/null "http://localhost:8080/health" 2>/dev/null; then
-    echo "✅  Server ready at http://localhost:8080"
-    open "http://localhost:8080" 2>/dev/null || true
-    break
-  fi
-  sleep 1
-done
+# ─── Step 4: Launch browser opener in background ───
+(
+  for i in $(seq 1 60); do
+    if curl -s -o /dev/null "http://localhost:8080/health" 2>/dev/null; then
+      echo "✅  Server ready at http://localhost:8080"
+      open "http://localhost:8080" 2>/dev/null || true
+      break
+    fi
+    sleep 1
+  done
+) &
 
 echo ""
 echo "🦄  Stay Mostlysane."
-
-# Keep terminal open so user can see the server output
 echo ""
 echo "───────────────────────────────────────────────────────"
 echo "  Server is running. Press Ctrl+C to stop."
 echo "───────────────────────────────────────────────────────"
-wait $SERVER_PID
+echo ""
+
+# Run server in foreground — Ctrl+C kills it directly
+"$SERVER" -m "$MODEL_DIR/$MODEL_NAME" $META_FLAGS --host 127.0.0.1 --port 8080
+exit $?

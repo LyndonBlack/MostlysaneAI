@@ -286,8 +286,18 @@ function detectOS() {
   }
   document.getElementById('os-detected').textContent =
     `(auto-detected: ${OS_CONFIG[osSelect.value].label})`;
+  applyOsPlatform();
+}
 
-  // Auto-detect platform based on OS
+// Called when user manually changes OS selector
+function onOsChange() {
+  applyOsPlatform();
+  updateConfig();
+}
+
+// Set platform + GPU options based on current OS selection
+function applyOsPlatform() {
+  const osSelect = document.getElementById('os');
   const platSelect = document.getElementById('platform');
   if (platSelect) {
     if (osSelect.value === 'macos') {
@@ -334,10 +344,11 @@ function updateGpuOptions() {
   // Set a sensible default GPU (not the smallest)
   const defaults = { nvidia: 2, apple: 12, amd: 0, intel: 0, apu: 0 };
   var idx = defaults[platform] || 0;
-  // Auto-select Intel Mac chip if browser is on an Intel Mac
-  if (platform === 'apple' && (/MacIntel/.test(navigator.platform) || /Intel.*Mac/.test(navigator.userAgent))) {
-    idx = cfg.gpus.length - 1; // last option = Intel Mac
-  }
+  // NOTE: We DO NOT auto-detect Intel Mac vs Apple Silicon here.
+  // navigator.platform === 'MacIntel' is NOT reliable — Chrome/Firefox
+  // on M1+ also report 'MacIntel' for web compat. Only Safari reports
+  // 'MacARM' on Apple Silicon. Default to the mid-range unified entry
+  // and let the user pick the correct chip.
   if (select.options[idx]) select.selectedIndex = idx;
 
   // Update contextual hints for Apple chip selection
@@ -471,23 +482,40 @@ function resolveDownloadUrl(file) {
 
 // ─── Prebuilt download + setup method toggle ───
 
-// Detect browser platform for download button
+// Detect platform for the prebuilt download button.
+// Priority: 1) OS dropdown (user override), 2) browser user agent.
+// This lets someone on Linux select macOS to download for a friend.
 function detectBrowserPlatform() {
+  var osSelect = document.getElementById('os');
+  if (osSelect && osSelect.value) {
+    var os = osSelect.value;
+    if (os === 'macos') {
+      // ARM vs Intel still depends on GPU dropdown + browser caps
+      if (/MacARM/.test(navigator.platform) || /arm|aarch64/.test(navigator.userAgent || '')) return 'mac-arm';
+      var gpuSelect = document.getElementById('gpu');
+      if (gpuSelect && gpuSelect.selectedIndex >= 0) {
+        var opt = gpuSelect.options[gpuSelect.selectedIndex];
+        if (opt && opt.text && opt.text.indexOf('Intel') >= 0) return 'mac-intel';
+      }
+      return 'mac-arm';
+    }
+    if (os === 'windows') return 'win';
+    if (os === 'linux') return 'linux';
+  }
+  // Fallback: browser user-agent detection
   const ua = navigator.userAgent || navigator.platform || '';
   if (/mac/i.test(ua) || /Macintosh|MacIntel|MacPPC|Mac68K/.test(ua)) {
-    // MacARM = native Apple Silicon; also check user-selected Intel Mac chip
     if (/MacARM/.test(navigator.platform) || /arm|aarch64/.test(ua)) return 'mac-arm';
-    // Check if user selected 'Intel Mac' in config dropdown
     var gpuSelect = document.getElementById('gpu');
     if (gpuSelect && gpuSelect.selectedIndex >= 0) {
       var opt = gpuSelect.options[gpuSelect.selectedIndex];
       if (opt && opt.text && opt.text.indexOf('Intel') >= 0) return 'mac-intel';
     }
-    return 'mac-intel'; // default for MacIntel / Rosetta
+    return 'mac-arm';
   }
   if (/win/i.test(ua) || /Win32|Win64|Windows/.test(ua)) return 'win';
   if (/linux/i.test(ua)) return 'linux';
-  return 'linux'; // default
+  return 'linux';
 }
 
 // Prebuilt download URL for detected platform
@@ -563,6 +591,10 @@ function renderPrebuiltDownload() {
   var plat = getPlatformLabel();
   var serverBin = getServerBinaryName();
 
+  // Get the user's selected model for custom run script
+  var selectedModel = getActiveModel();
+  var modelFile = selectedModel ? getVariantFile(selectedModel) : '';
+
   area.innerHTML = '' +
     '<a href="' + url + '" download style="display:inline-block;padding:0.65rem 1.5rem;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;font-size:1rem;text-decoration:none;margin-bottom:0.75rem">' +
     '⬇  Download for ' + plat +
@@ -571,22 +603,84 @@ function renderPrebuiltDownload() {
     'Binary: <code>' + fname + '</code> (~50-80 MB)' +
     '</p>';
 
-  // Set the run command (refers to run.command for macOS, run.bat for Windows)
+  // Set the run command — model-specific when a model is selected
+  var plat = detectBrowserPlatform();
+  var isWin = plat === 'win';
+  var isMac = plat === 'mac-arm' || plat === 'mac-intel';
   var cmdBlock = document.getElementById('prebuilt-run-cmd');
   if (cmdBlock) {
-    var plat = detectBrowserPlatform();
-    var isWin = plat === 'win';
-    var isMac = plat === 'mac-arm' || plat === 'mac-intel';
-    var runCmd;
-    if (isMac) {
-      runCmd = 'Extract the .tar.gz, then double-click run.command';
-    } else if (isWin) {
-      runCmd = 'Extract the zip, then double-click run.bat';
+    if (modelFile) {
+      // Show the exact command with the user's model
+      var runner = isMac ? 'run.command' : isWin ? 'run.bat' : 'run.sh';
+      cmdBlock.innerHTML = 'Extract the .tar.gz, then run:<br>' +
+        '<strong style="font-size:0.95rem">./' + runner + ' ' + modelFile + '</strong>' +
+        '<br><span style="font-size:0.8rem;color:var(--text-muted)">(or double-click ' + runner + ' to auto-detect a model in your models folder)</span>';
     } else {
-      runCmd = 'Extract the .tar.gz, then run:  ./run.sh';
+      if (isMac) {
+        cmdBlock.innerHTML = 'Extract the .tar.gz, then <strong>double-click run.command</strong>';
+      } else if (isWin) {
+        cmdBlock.innerHTML = 'Extract the zip, then <strong>double-click run.bat</strong>';
+      } else {
+        cmdBlock.innerHTML = 'Extract the .tar.gz, then <strong>./run.sh</strong>';
+      }
     }
-    cmdBlock.textContent = runCmd;
   }
+
+  // Generate a downloadable custom run script with the model baked in
+  var scriptBlock = document.getElementById('custom-run-script');
+  if (scriptBlock) {
+    if (modelFile) {
+      scriptBlock.style.display = '';
+      var filename = isWin ? 'run.bat' : 'run.sh';
+      var content = generateCustomRunScript(plat, serverBin, modelFile, modelFile);
+      var dlBtn = scriptBlock.querySelector('.custom-run-dl-btn');
+      downloadAsFile(dlBtn, filename, content);
+    } else {
+      scriptBlock.style.display = 'none';
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────
+//  Custom run script generator
+// ─────────────────────────────────────────────────
+// Generates a lightweight script that just sets the correct model
+// name and delegates to the static run.sh bundled with the download.
+function generateCustomRunScript(plat, serverBin, modelFile, modelName) {
+  if (plat === 'win') {
+    var escaped = modelName.replace(/\$/g, '$$');
+    return '@echo off\n' +
+      'REM Mostlysane Local AI — Custom run script\n' +
+      'REM Generated for: ' + modelName + '\n' +
+      'REM Sets the model and delegates to run.bat\n' +
+      'setlocal enabledelayedexpansion\n' +
+      'call "%~dp0run.bat" ' + escaped + '\n' +
+      'pause\n';
+  }
+  // Unix (macOS / Linux)
+  return '#!/usr/bin/env bash\n' +
+    '# Mostlysane Local AI — Custom run script\n' +
+    '# Generated for: ' + modelName + '\n' +
+    '# Sets the model and delegates to run.sh in the same directory.\n' +
+    'set -euo pipefail\n' +
+    'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n' +
+    'exec "$SCRIPT_DIR/run.sh" "' + modelName.replace(/"/g, '\"') + '"\n';
+}
+
+function downloadAsFile(btn, filename, content) {
+  if (!btn) return;
+  btn.onclick = function(e) {
+    e.preventDefault();
+    var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+  };
 }
 
 // ─────────────────────────────────────────────────
