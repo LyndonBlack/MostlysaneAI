@@ -1,0 +1,92 @@
+# Build Mostlysane prebuilt binary for Intel Mac (macOS 13)
+#
+# Separate workflow from the main build matrix because macos-13 runners
+# have a tiny pool and can stay queued for hours. This keeps all other
+# platform builds from being blocked.
+#
+# Triggers:
+#   - Manual dispatch from GitHub Actions tab (recommended)
+#   - Push to main that changes this workflow file
+#
+# Binary URL:
+#   https://github.com/LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant/releases/latest/download/llama-server-macos-intel.tar.gz
+#
+# 1. Go to: https://github.com/LyndonBlack/MostlysaneAI/actions/workflows/build-binaries-intel-mac.yml
+# 2. Click "Run workflow"
+# 3. Optionally set a version tag (e.g. v1.0.0) to attach binary to a release
+
+name: Build Intel Mac binary
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (e.g. v1.0.0). Leave blank for artifact-only build.'
+        required: false
+        type: string
+  push:
+    paths:
+      - '.github/workflows/build-binaries-intel-mac.yml'
+    branches: [main]
+
+jobs:
+  build-intel-mac:
+    runs-on: macos-13
+
+    steps:
+      - name: Checkout turboternary branch (llama.cpp fork)
+        uses: actions/checkout@v4
+        with:
+          repository: LyndonBlack/llama.cpp-Ternary-1.58Bit-and-TurboQuant
+          ref: turboternary
+
+      # ── Build ──
+
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake ..
+
+      - name: Build
+        run: |
+          cd build
+          NPROC=$(sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
+          cmake --build . --config Release -j$NPROC --target llama-server
+
+      # ── Package ──
+
+      - name: Package
+        run: |
+          cd build/bin
+          echo "Files in build/bin:" && ls -la
+          tar czf ../../llama-server-macos-intel.tar.gz \
+            llama-server *.dylib 2>/dev/null
+          echo "Packaged: $(ls -lh ../../llama-server-macos-intel.tar.gz)"
+
+      # ── Upload to Actions artifacts (always) ──
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: llama-server-macos-intel
+          path: llama-server-macos-intel.tar.gz
+
+      # ── Upload to GitHub Release (only when version input is set) ──
+
+      - name: Create Release
+        if: inputs.version != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version }}
+          name: "Mostlysane ${{ inputs.version }}"
+          body: "Prebuilt llama-server binary for Intel Mac."
+          files: |
+            llama-server-macos-intel.tar.gz
+          fail_on_unmatched_files: false
